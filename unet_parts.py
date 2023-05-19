@@ -57,7 +57,7 @@ class Up(nn.Module):
             self.conv = ResBlock(in_channels, out_channels, in_channels // 2)
         else:
             self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
-            self.conv = ResBlock(in_channels, out_chasnnels)
+            self.conv = ResBlock(in_channels, out_channels)
 
     def forward(self, x1, x2):
         x1 = self.up(x1)
