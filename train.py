@@ -60,31 +60,17 @@ def train_model(model, epochs, batch_size, learning_rate, device):
             optimizer.step()
 
 
-def get_args():
-    parser = argparse.ArgumentParser(description='Train the UNet on metagrating dataset')
-    parser.add_argument('--epochs', '-e', metavar='E', type=int, default=5, help='Number of epochs')
-    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=1, help='Batch size')
-    parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=1e-5,
-                        help='Learning rate', dest='lr')
-    parser.add_argument('--scale', '-s', type=float, default=0.5, help='Downscaling factor of the images')
-    parser.add_argument('--validation', '-v', dest='val', type=float, default=10.0,
-                        help='Percent of the data that is used as validation (0-100)')
-    parser.add_argument('--bilinear', action='store_true', default=False, help='Use bilinear upsampling')
-    parser.add_argument('--classes', '-c', type=int, default=2, help='Number of classes')
-
-    return parser.parse_args()
-
-
 if __name__ == '__main__':
-    args = get_args()
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
     
-
     train_model(
             model=model,
-            epochs=2,
-            batch_size=5,
+            epochs=1,
+            batch_size=10,
             learning_rate=0.001,
             device=device)
+    
+    torch.save(model.state_dict(), 'model.pth')
