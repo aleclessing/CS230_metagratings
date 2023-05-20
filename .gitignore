@@ -1,0 +1,4 @@
+data/*.npz
+experiments/metagratings/log
+experiments/metagratings/__pycache__/
+src/__pycache__/
