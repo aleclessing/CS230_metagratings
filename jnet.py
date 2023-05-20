@@ -14,6 +14,7 @@ class JNet(nn.Module):
         self.lopside = Up(self.in_channels, self.dynamic_channels)
 
     def forward(self, x):
+        print('c1', x.shape)
         x = self.unet(x)
         x = self.lopside(x)
         return x
