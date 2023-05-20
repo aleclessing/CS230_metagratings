@@ -2,6 +2,7 @@ import argparse
 import jnet
 import os
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 from torch import optim
 from torch.utils.data import DataLoader, random_split
@@ -15,7 +16,7 @@ def train_model(model, epochs, batch_size, learning_rate, device):
     
     # 1. Open Dataset
     dataset = loader.MetaGratingDataLoader(return_hres=True, hr_data_filename='data/hr_data.npz', lr_data_filename='data/lr_data.npz')
-    reHy = dataset[1] # Re_Hy
+    # print(dataset[0]) # First sample out of 100 with information on the Re, Im, and eps 
     
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * 0.1) # 90-10 split
@@ -40,6 +41,17 @@ def train_model(model, epochs, batch_size, learning_rate, device):
     for epoch in range(1, epochs + 1):
         model.train()
         epoch_loss = 0
+        batchcount = 1
+        # print("epoch " + str(epoch) + " started")
+        for batch in train_loader:
+            # print("processing batch " + str(batchcount))
+            batchcount+=1
+            metagratings, ground_truth = batch[0], batch[1] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
+            # print(metagratings.size()) # [9][][31][128] number of test samples per batch, real and imaginary components of H, pixels in device 256 x 64
+            y_hat = model(metagratings)
+            # loss = nn.MSELoss(metagratings,ground_truth)
+            # loss += nn.MSELoss(F.relu(metagratings.squeeze(1)), ground_truth.float())
+
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on metagrating dataset')
@@ -60,7 +72,7 @@ if __name__ == '__main__':
     args = get_args()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=3)
+    model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
 
     train_model(
             model=model,
