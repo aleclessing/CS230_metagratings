@@ -10,13 +10,16 @@ class JNet(nn.Module):
         self.in_channels = static_channels + dynamic_channels
         self.im_dim = im_dim
 
-        self.unet = UNet(self.in_channels)
-        self.lopside = Up(self.in_channels, self.dynamic_channels)
+        self.unet = UNet(self.in_channels, 16)
+        self.super_up = nn.ConvTranspose2d(self.in_channels + 16, self.dynamic_channels, kernel_size=2, stride=2)
 
     def forward(self, x):
-        print('c1', x.shape)
+        x_orig = x
         x = self.unet(x)
-        x = self.lopside(x)
+
+        x = torch.cat([x, x_orig], dim=1)
+        x = self.super_up(x)
+        
         return x
 
         

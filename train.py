@@ -47,9 +47,9 @@ def train_model(model, epochs, batch_size, learning_rate, device):
             print("processing batch " + str(batchcount))
             batchcount+=1
             metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
-            print('c0', metagratings.shape)
             y_hat = model(metagratings)
-            loss = nn.MSELoss(y_hat,ground_truth)
+            print(y_hat.shape, ground_truth.shape)
+            #loss = nn.MSELoss(y_hat,ground_truth)
 
 
 def get_args():
