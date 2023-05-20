@@ -32,7 +32,7 @@ def train_model(model, epochs, batch_size, learning_rate, device):
     weight_decay: float = 1e-8
     momentum: float = 0.999
     print(list(model.parameters()))
-    # optimizer = optim.RMSprop(model.parameters(),
+    #optimizer = optim.RMSprop(model.parameters(),
     #                           lr=learning_rate, weight_decay=weight_decay, momentum=momentum, foreach=True)
     optimizer = optim.SGD( params = model.parameters (), lr=0.1, momentum=0.8 )
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
@@ -44,9 +44,9 @@ def train_model(model, epochs, batch_size, learning_rate, device):
         model.train()
         epoch_loss = 0
         batchcount = 1
-        # print("epoch " + str(epoch) + " started")
+        print("epoch " + str(epoch) + " started")
         for batch in train_loader:
-            # print("processing batch " + str(batchcount))
+            print("processing batch " + str(batchcount))
             batchcount+=1
             metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
             # print(metagratings.size()) # [9][][31][128] number of test samples per batch, real and imaginary components of H, pixels in device 256 x 64
@@ -79,7 +79,7 @@ if __name__ == '__main__':
 
     train_model(
             model=model,
-            epochs=10,
-            batch_size=10,
+            epochs=2,
+            batch_size=5,
             learning_rate=0.001,
             device=device)

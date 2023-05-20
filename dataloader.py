@@ -33,7 +33,7 @@ class MetaGratingDataLoader(Dataset):
         self.return_hres = return_hres
 
     def __len__(self):
-        return self.hr_data.shape[1]
+        return 10 #self.hr_data.shape[1]
 
     def __getitem__(self, idx):
         """Get the random cutout data cube corresponding to idx.
