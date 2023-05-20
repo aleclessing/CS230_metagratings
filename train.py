@@ -32,9 +32,9 @@ def train_model(model, epochs, batch_size, learning_rate, device):
     weight_decay: float = 1e-8
     momentum: float = 0.999
 
-    optimizer = optim.SGD( params = model.parameters (), lr=0.1, momentum=0.8 )
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
-    criterion = nn.BCEWithLogitsLoss()
+    optimizer = optim.SGD(params = model.parameters(), lr=0.1, momentum=0.8 )
+    loss_fn = nn.MSELoss()
+
     global_step = 0
 
     # 5. Begin training
@@ -44,12 +44,20 @@ def train_model(model, epochs, batch_size, learning_rate, device):
         batchcount = 1
         print("epoch " + str(epoch) + " started")
         for batch in train_loader:
+
+            optimizer.zero_grad(set_to_none=True)
+
+
             print("processing batch " + str(batchcount))
             batchcount+=1
             metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
             y_hat = model(metagratings)
-            print(y_hat.shape, ground_truth.shape)
-            #loss = nn.MSELoss(y_hat,ground_truth)
+            
+            loss = loss_fn(y_hat,ground_truth)
+            print("loss", loss.item())
+            loss.backward()
+
+            optimizer.step()
 
 
 def get_args():
@@ -72,6 +80,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
+    
 
     train_model(
             model=model,

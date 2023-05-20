@@ -66,7 +66,7 @@ class MetaGratingDataLoader(Dataset):
             return_tensors = return_tensors + [point_coord, point_value]
 
         if self.return_hres:
-            return_tensors = [hres_space] + return_tensors
+            return_tensors = [hres_space[1:]] + return_tensors #remove eps channel from hres_space
 
         # cast everything to float32
         return_tensors = [t.astype(np.float32) for t in return_tensors]
