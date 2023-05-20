@@ -15,7 +15,7 @@ class MetaGratingDataLoader(Dataset):
     Loads 
     """
 
-    def __init__(self, hr_data_filename='data/hr_data.npz', lr_data_filename= 'data/lr_data.npz', n_samp_pts=1024, return_hres=False):
+    def __init__(self, hr_data_filename='data/hr_data.npz', lr_data_filename= 'data/lr_data.npz', n_samp_pts=0, return_hres=False):
         
         self.hr_data_filename = hr_data_filename
         self.lr_data_filename = lr_data_filename
@@ -53,20 +53,25 @@ class MetaGratingDataLoader(Dataset):
         hres_space = self.hr_data[:, idx, :, :] # [c, example_num, x, z]
         lres_space = self.lr_data[:, idx, :, :]
 
-        interp = RegularGridInterpolator(
-            (np.arange(self.nx_hr), np.arange(self.nz_hr)), values = hres_space.transpose(1, 2, 0))
+        return_tensors = [lres_space]
 
-        point_coord = np.random.rand(self.n_samp_pts, 2) * (self.scale_hres - 1)
-        point_value = interp(point_coord)
-        point_coord = point_coord/(self.scale_hres - 1)
+        if self.n_samp_pts != 0:
+            interp = RegularGridInterpolator(
+                (np.arange(self.nx_hr), np.arange(self.nz_hr)), values = hres_space.transpose(1, 2, 0))
 
-        return_tensors = [lres_space, point_coord, point_value]
+            point_coord = np.random.rand(self.n_samp_pts, 2) * (self.scale_hres - 1)
+            point_value = interp(point_coord)
+            point_coord = point_coord/(self.scale_hres - 1)
+
+            return_tensors = return_tensors + [point_coord, point_value]
+
+        if self.return_hres:
+            return_tensors = [hres_space] + return_tensors
 
         # cast everything to float32
         return_tensors = [t.astype(np.float32) for t in return_tensors]
 
-        if self.return_hres:
-            return_tensors = [hres_space] + return_tensors
+
         return tuple(return_tensors)
 
 

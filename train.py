@@ -8,7 +8,7 @@ from torch import optim
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
-import dataloader_spacetime as loader
+import dataloader as loader
 from jnet import JNet
 from unet import UNet
 
