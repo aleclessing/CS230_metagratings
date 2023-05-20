@@ -31,8 +31,10 @@ def train_model(model, epochs, batch_size, learning_rate, device):
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     weight_decay: float = 1e-8
     momentum: float = 0.999
-    optimizer = optim.RMSprop(model.parameters(),
-                              lr=learning_rate, weight_decay=weight_decay, momentum=momentum, foreach=True)
+    print(list(model.parameters()))
+    # optimizer = optim.RMSprop(model.parameters(),
+    #                           lr=learning_rate, weight_decay=weight_decay, momentum=momentum, foreach=True)
+    optimizer = optim.SGD( params = model.parameters (), lr=0.1, momentum=0.8 )
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=5)  # goal: maximize Dice score
     criterion = nn.BCEWithLogitsLoss()
     global_step = 0
@@ -46,8 +48,9 @@ def train_model(model, epochs, batch_size, learning_rate, device):
         for batch in train_loader:
             # print("processing batch " + str(batchcount))
             batchcount+=1
-            metagratings, ground_truth = batch[0], batch[1] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
+            metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
             # print(metagratings.size()) # [9][][31][128] number of test samples per batch, real and imaginary components of H, pixels in device 256 x 64
+            # print(metagratings.size())
             y_hat = model(metagratings)
             # loss = nn.MSELoss(metagratings,ground_truth)
             # loss += nn.MSELoss(F.relu(metagratings.squeeze(1)), ground_truth.float())
