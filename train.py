@@ -67,9 +67,9 @@ if __name__ == '__main__':
     
     train_model(
             model=model,
-            epochs=3,
+            epochs=6,
             batch_size=30,
-            learning_rate=0.1,
+            learning_rate=0.01,
             device=device)
     
     torch.save(model.state_dict(), 'model.pth')

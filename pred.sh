@@ -1,1 +1,1 @@
-python predict.py -e 0
+python predict.py -e 1
