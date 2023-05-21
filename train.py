@@ -30,9 +30,9 @@ def train_model(model, epochs, batch_size, learning_rate, device):
 
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     weight_decay: float = 1e-8
-    momentum: float = 0.999
+    momentum: float = 0.99
 
-    optimizer = optim.SGD(params = model.parameters(), lr=0.1, momentum=0.8 )
+    optimizer = optim.SGD(params = model.parameters(), lr=learning_rate, momentum=momentum)
     loss_fn = nn.MSELoss()
 
     global_step = 0
@@ -47,7 +47,6 @@ def train_model(model, epochs, batch_size, learning_rate, device):
 
             optimizer.zero_grad(set_to_none=True)
 
-
             print("processing batch " + str(batchcount))
             batchcount+=1
             metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
@@ -61,16 +60,16 @@ def train_model(model, epochs, batch_size, learning_rate, device):
 
 
 if __name__ == '__main__':
-    
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
     
     train_model(
             model=model,
-            epochs=1,
-            batch_size=10,
-            learning_rate=0.001,
+            epochs=3,
+            batch_size=30,
+            learning_rate=0.1,
             device=device)
     
     torch.save(model.state_dict(), 'model.pth')

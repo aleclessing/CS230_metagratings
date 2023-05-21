@@ -11,7 +11,8 @@ class JNet(nn.Module):
         self.im_dim = im_dim
 
         self.unet = UNet(self.in_channels, 16)
-        self.super_up = nn.ConvTranspose2d(self.in_channels + 16, self.dynamic_channels, kernel_size=2, stride=2)
+        self.super_up = nn.ConvTranspose2d(self.in_channels + 16, 16, kernel_size=2, stride=2)
+        self.super_resblock = ResBlock(16, self.dynamic_channels)
 
     def forward(self, x):
         x_orig = x
@@ -19,7 +20,9 @@ class JNet(nn.Module):
 
         x = torch.cat([x, x_orig], dim=1)
         x = self.super_up(x)
-        
+
+        x = self.super_resblock(x)
+
         return x
 
         
