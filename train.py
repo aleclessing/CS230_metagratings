@@ -1,5 +1,6 @@
 import argparse
 import jnet
+import matplotlib.pyplot as plt
 import os
 import torch
 import torch.nn.functional as F
@@ -38,9 +39,10 @@ def train_model(model, epochs, batch_size, learning_rate, device):
     global_step = 0
 
     # 5. Begin training
+    loss_values = [] # For saving epoch loss
     for epoch in range(1, epochs + 1):
         model.train()
-        epoch_loss = 0
+        batch_loss = []
         batchcount = 1
         print("epoch " + str(epoch) + " started")
         for batch in train_loader:
@@ -55,8 +57,16 @@ def train_model(model, epochs, batch_size, learning_rate, device):
             loss = loss_fn(y_hat,ground_truth)
             print("loss", loss.item())
             loss.backward()
-
             optimizer.step()
+            batch_loss.append(loss.item())
+        loss_values.append(sum(batch_loss) / len(batch_loss))
+    x_data = list(range(epochs))
+    # Plot loss function
+    plt.scatter(x_data, loss_values, c='r', label='data')
+    plt.xlabel('epoch')
+    plt.ylabel('loss')
+    plt.title('Training Loss')
+    plt.show()
 
 
 if __name__ == '__main__':
