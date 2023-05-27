@@ -1,3 +1,5 @@
+# NOTE TO SELF: try using tensorboard for logging instead of wandb
+
 import argparse
 import jnet
 import matplotlib.pyplot as plt
@@ -9,11 +11,14 @@ from torch import optim
 from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
+# from evaluate import evaluate
 import dataloader as loader
 from jnet import JNet
 from unet import UNet
 
-def train_model(model, epochs, batch_size, learning_rate, device):
+from torch.utils.tensorboard import SummaryWriter
+
+def train_model(model, epochs, batch_size, learning_rate, device , writer):
     
     # 1. Open Dataset
     dataset = loader.MetaGratingDataLoader(return_hres=True, hr_data_filename='data/hr_data.npz', lr_data_filename='data/lr_data.npz')
@@ -39,7 +44,7 @@ def train_model(model, epochs, batch_size, learning_rate, device):
     global_step = 0
 
     # 5. Begin training
-    loss_values = [] # For saving epoch loss
+    train_loss_values = [] # For saving epoch loss
     for epoch in range(1, epochs + 1):
         model.train()
         batch_loss = []
@@ -54,15 +59,32 @@ def train_model(model, epochs, batch_size, learning_rate, device):
             metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
             y_hat = model(metagratings)
             
-            loss = loss_fn(y_hat,ground_truth)
-            print("loss", loss.item())
-            loss.backward()
+            train_loss = loss_fn(y_hat,ground_truth)
+            print("loss", train_loss.item())
+            writer.add_scalar("Loss/train", train_loss, epoch)
+            train_loss.backward()
             optimizer.step()
-            batch_loss.append(loss.item())
-        loss_values.append(sum(batch_loss) / len(batch_loss))
+            batch_loss.append(train_loss.item())
+        avg_train_loss = sum(batch_loss) / len(batch_loss)
+        train_loss_values.append(avg_train_loss)
+        writer.add_scalar("Loss/train_avg", avg_train_loss, epoch)
+
+        # This is a mess at present
+        # model.eval()
+        # with torch.no_grad():
+        #     for batch in val_loader:
+        #         metagratings, ground_truth = batch[1], batch[0]
+        #         y_hat = model(metagratings)
+        #         val_loss = loss_fn(y_hat, ground_truth)
+        #         writer.add_scalar("Loss/val", val_loss, epoch)
+        #         print("val loss", val_loss.item())
+        #     avg_val_loss = sum(batch_loss) / len(batch_loss)
+        #     writer.add_scalar("Loss/val_avg", val_loss, epoch)
+
+
     x_data = list(range(epochs))
     # Plot loss function
-    plt.scatter(x_data, loss_values, c='r', label='data')
+    plt.scatter(x_data, train_loss_values, c='r', label='data')
     plt.xlabel('epoch')
     plt.ylabel('loss')
     plt.title('Training Loss')
@@ -72,14 +94,22 @@ def train_model(model, epochs, batch_size, learning_rate, device):
 if __name__ == '__main__':
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
     model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
+
+    # Create a SummaryWriter for logging
+    writer = SummaryWriter()
     
     train_model(
             model=model,
-            epochs=6,
+            epochs=3, # was 6
             batch_size=30,
             learning_rate=0.01,
-            device=device)
+            device=device,
+            writer=writer)
+   
+    writer.flush() # Not entirely sure what this does
     
     torch.save(model.state_dict(), 'model.pth')
+
+    # Close the SummaryWriter
+    writer.close()
