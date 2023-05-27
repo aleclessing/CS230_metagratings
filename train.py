@@ -1,5 +1,3 @@
-# NOTE TO SELF: try using tensorboard for logging instead of wandb
-
 import argparse
 import jnet
 import matplotlib.pyplot as plt
@@ -18,7 +16,7 @@ from unet import UNet
 
 from torch.utils.tensorboard import SummaryWriter
 
-def train_model(model, epochs, batch_size, learning_rate, device , writer):
+def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer):
     
     # 1. Open Dataset
     dataset = loader.MetaGratingDataLoader(return_hres=True, hr_data_filename='data/hr_data.npz', lr_data_filename='data/lr_data.npz')
@@ -47,48 +45,54 @@ def train_model(model, epochs, batch_size, learning_rate, device , writer):
     train_loss_values = [] # For saving epoch loss
     for epoch in range(1, epochs + 1):
         model.train()
-        batch_loss = []
-        batchcount = 1
+        train_batch_loss = []
+        train_batchcount = 1
         print("epoch " + str(epoch) + " started")
         for batch in train_loader:
 
             optimizer.zero_grad(set_to_none=True)
 
-            print("processing batch " + str(batchcount))
-            batchcount+=1
+            print("processing training batch " + str(train_batchcount))
+            train_batchcount+=1
             metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
             y_hat = model(metagratings)
             
             train_loss = loss_fn(y_hat,ground_truth)
-            print("loss", train_loss.item())
-            writer.add_scalar("Loss/train", train_loss, epoch)
+            train_writer.add_scalar("Loss", train_loss, epoch)
+            print("training loss", train_loss.item())
             train_loss.backward()
             optimizer.step()
-            batch_loss.append(train_loss.item())
-        avg_train_loss = sum(batch_loss) / len(batch_loss)
+            train_batch_loss.append(train_loss.item())
+        avg_train_loss = sum(train_batch_loss) / train_batchcount
         train_loss_values.append(avg_train_loss)
-        writer.add_scalar("Loss/train_avg", avg_train_loss, epoch)
+        train_writer.add_scalar("Avg Loss", avg_train_loss, epoch)
 
-        # This is a mess at present
-        # model.eval()
-        # with torch.no_grad():
-        #     for batch in val_loader:
-        #         metagratings, ground_truth = batch[1], batch[0]
-        #         y_hat = model(metagratings)
-        #         val_loss = loss_fn(y_hat, ground_truth)
-        #         writer.add_scalar("Loss/val", val_loss, epoch)
-        #         print("val loss", val_loss.item())
-        #     avg_val_loss = sum(batch_loss) / len(batch_loss)
-        #     writer.add_scalar("Loss/val_avg", val_loss, epoch)
+        # Evaluate the model on the validation set
+        model.eval() # sets the model to evaluation mode
+        with torch.no_grad():
+            val_batch_loss = []
+            val_batchcount = 1
+            for batch in val_loader:
+                print("processing val batch " + str(val_batchcount))
+                val_batchcount+=1
+                metagratings, ground_truth = batch[1], batch[0]
+                y_hat = model(metagratings)
+                val_loss = loss_fn(y_hat, ground_truth) 
+                val_writer.add_scalar("Loss", val_loss, epoch)
+                print("val loss", val_loss.item())
+                val_batch_loss.append(val_loss.item())
+            avg_val_loss = sum(val_batch_loss) / val_batchcount
+            val_writer.add_scalar("Avg Loss", avg_val_loss, epoch)
 
 
-    x_data = list(range(epochs))
-    # Plot loss function
-    plt.scatter(x_data, train_loss_values, c='r', label='data')
-    plt.xlabel('epoch')
-    plt.ylabel('loss')
-    plt.title('Training Loss')
-    plt.show()
+    # Replaced with tensorboard logging
+    # x_data = list(range(epochs))
+    # # Plot loss function
+    # plt.scatter(x_data, train_loss_values, c='r', label='data')
+    # plt.xlabel('epoch')
+    # plt.ylabel('loss')
+    # plt.title('Training Loss')
+    # plt.show()
 
 
 if __name__ == '__main__':
@@ -96,20 +100,33 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
 
+    # Define hyperparameters
+    epochs=6 
+    batch_size=30
+    learning_rate=0.01
+
     # Create a SummaryWriter for logging
-    writer = SummaryWriter()
+    suffix = f"jnet_{epochs}e_{batch_size}b_{learning_rate}lr"
+    train_writer = SummaryWriter(log_dir="logs/train_logs", filename_suffix=suffix)
+    val_writer = SummaryWriter(log_dir="logs/val_logs", filename_suffix=suffix)
     
     train_model(
             model=model,
-            epochs=3, # was 6
-            batch_size=30,
-            learning_rate=0.01,
+            epochs=epochs,
+            batch_size=batch_size,
+            learning_rate=learning_rate,
             device=device,
-            writer=writer)
+            train_writer=train_writer,
+            val_writer=val_writer)
    
-    writer.flush() # Not entirely sure what this does
+    train_writer.flush()
+    val_writer.flush()
     
     torch.save(model.state_dict(), 'model.pth')
 
     # Close the SummaryWriter
-    writer.close()
+    train_writer.close()
+    val_writer.close()
+
+# To see the tensorboard logs, run the following command in the terminal:
+# tensorboard --logdir=logs
