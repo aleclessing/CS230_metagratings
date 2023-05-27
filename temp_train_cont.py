@@ -55,7 +55,7 @@ def train_model(model, epochs, batch_size, learning_rate, device):
 
             pred_pt_vals = model(lr_grid, pt_coords)
             
-            loss = loss_fn(pred_pt_vals, pt_vals[:,:,1:])
+            loss = loss_fn(pred_pt_vals, pt_vals)
             print("loss", loss.item())
             loss.backward()
 
@@ -72,7 +72,7 @@ if __name__ == '__main__':
             model=model,
             epochs=10,
             batch_size=64,
-            learning_rate=0.01,
+            learning_rate=0.1,
             device=device)
     
     torch.save(model.state_dict(), 'cont_model.pth')
