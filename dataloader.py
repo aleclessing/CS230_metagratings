@@ -61,7 +61,7 @@ class MetaGratingDataLoader(Dataset):
             point_value = interp(point_coord)
             point_coord = point_coord
 
-            return_tensors = return_tensors + [point_coord, point_value]
+            return_tensors = return_tensors + [point_coord, point_value[:,1:]]
 
         if self.return_hres:
             return_tensors = [hres_space[1:]] + return_tensors #remove eps channel from hres_space
