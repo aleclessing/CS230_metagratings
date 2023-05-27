@@ -49,20 +49,18 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
         train_batchcount = 1
         print("epoch " + str(epoch) + " started")
         for batch in train_loader:
-
             optimizer.zero_grad(set_to_none=True)
-
             print("processing training batch " + str(train_batchcount))
             train_batchcount+=1
             metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
             y_hat = model(metagratings)
-            
             train_loss = loss_fn(y_hat,ground_truth)
             train_writer.add_scalar("Loss", train_loss, epoch)
             print("training loss", train_loss.item())
             train_loss.backward()
             optimizer.step()
             train_batch_loss.append(train_loss.item())
+
         avg_train_loss = sum(train_batch_loss) / train_batchcount
         train_loss_values.append(avg_train_loss)
         train_writer.add_scalar("Avg Loss", avg_train_loss, epoch)
@@ -81,6 +79,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
                 val_writer.add_scalar("Loss", val_loss, epoch)
                 print("val loss", val_loss.item())
                 val_batch_loss.append(val_loss.item())
+
             avg_val_loss = sum(val_batch_loss) / val_batchcount
             val_writer.add_scalar("Avg Loss", avg_val_loss, epoch)
 
@@ -101,7 +100,7 @@ if __name__ == '__main__':
     model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
 
     # Define hyperparameters
-    epochs=6 
+    epochs=3 
     batch_size=30
     learning_rate=0.01
 
