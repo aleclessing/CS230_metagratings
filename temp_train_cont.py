@@ -9,13 +9,12 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 import dataloader as loader
-from jnet import JNet
-from unet import UNet
+from cont_jnet import ContJNet
 
 def train_model(model, epochs, batch_size, learning_rate, device):
     
     # 1. Open Dataset
-    dataset = loader.MetaGratingDataLoader(return_hres=True, hr_data_filename='data/hr_data.npz', lr_data_filename='data/lr_data.npz')
+    dataset = loader.MetaGratingDataLoader(hr_data_filename='data/hr_data.npz', lr_data_filename='data/lr_data.npz', n_samp_pts=1024)
     # print(dataset[0]) # First sample out of 100 with information on the Re, Im, and eps 
     
     # 2. Split into train / validation partitions
@@ -49,10 +48,14 @@ def train_model(model, epochs, batch_size, learning_rate, device):
 
             print("processing batch " + str(batchcount))
             batchcount+=1
-            metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
-            y_hat = model(metagratings)
             
-            loss = loss_fn(y_hat,ground_truth)
+            lr_grid = batch[0]
+            pt_coords = batch[1]
+            pt_vals = batch[2]
+
+            pred_pt_vals = model(lr_grid, pt_coords)
+            
+            loss = loss_fn(pred_pt_vals, pt_vals[:,:,1:])
             print("loss", loss.item())
             loss.backward()
 
@@ -63,13 +66,13 @@ if __name__ == '__main__':
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
+    model = ContJNet(static_channels=1, dynamic_channels=2)
     
     train_model(
             model=model,
-            epochs=6,
-            batch_size=30,
+            epochs=10,
+            batch_size=64,
             learning_rate=0.01,
             device=device)
     
-    torch.save(model.state_dict(), 'model.pth')
+    torch.save(model.state_dict(), 'cont_model.pth')

@@ -1,25 +1,25 @@
 from unet import *
 from cont_decoder import *
 
-class JNet(nn.Module):
+class ContJNet(nn.Module):
 
-    def __init__(self, im_dim=(64, 256), static_channels=1, dynamic_channels=2):
+    def __init__(self, static_channels=1, dynamic_channels=2):
         super().__init__()
 
         self.static_channles = static_channels
         self.dynamic_channels = dynamic_channels
         self.in_channels = static_channels + dynamic_channels
-        self.im_dim = im_dim
 
         self.unet = UNet(self.in_channels, 32)
         self.cont_decoder = ContDecoder(32, output_channels=dynamic_channels)
         
         
-    def forward(self, x):
-        x_orig = x
-        x = self.unet(x)
+    def forward(self, lr_grid, coords):
 
-        x = torch.cat([x, x_orig], dim=1)
+        context_grid = self.unet(lr_grid)
+        
+        x = self.cont_decoder(context_grid, coords)
+
         
 
         return x

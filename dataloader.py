@@ -42,13 +42,7 @@ class MetaGratingDataLoader(Dataset):
           idx: int, index of the example to return. must be smaller than len(self).
 
         Returns:
-          space_crop_hres (*optional): array of shape [4, nz_hres, nx_hres],
-          where 4 are the phys channels pbuw.
-          space_crop_lres: array of shape [4, nt_lres, nz_lres, nx_lres], where 4 are the phys
-          channels pbuw.
-          point_coord: array of shape [n_samp_pts_per_crop, 2], where 3 are the x, z dims.
-                       CAUTION - point_coord are normalized to (0, 1) for the relative window.
-          point_value: array of shape [n_samp_pts_per_crop, 4], where 4 are the phys channels pbuw.
+          TODO
         """
         hres_space = self.hr_data[:, idx, :, :] # [c, example_num, x, z]
         lres_space = self.lr_data[:, idx, :, :]
@@ -56,12 +50,16 @@ class MetaGratingDataLoader(Dataset):
         return_tensors = [lres_space]
 
         if self.n_samp_pts != 0:
-            interp = RegularGridInterpolator(
-                (np.arange(self.nx_hr), np.arange(self.nz_hr)), values = hres_space.transpose(1, 2, 0))
+            x_grid_pts = 2*(np.arange(self.nx_hr) + 0.5)/self.nx_hr-1
+            z_grid_pts = 2*(np.arange(self.nz_hr) + 0.5)/self.nz_hr-1
 
-            point_coord = np.random.rand(self.n_samp_pts, 2) * (self.scale_hres - 1)
+            interp = RegularGridInterpolator((x_grid_pts, z_grid_pts), values = hres_space.transpose(1, 2, 0), bounds_error=False, fill_value=None)
+
+            #points range from -1 to +1 in line with convention of pytorch grid_sample
+            point_coord = 2*np.random.rand(self.n_samp_pts, 2) - 1 
+
             point_value = interp(point_coord)
-            point_coord = point_coord/(self.scale_hres - 1)
+            point_coord = point_coord
 
             return_tensors = return_tensors + [point_coord, point_value]
 
