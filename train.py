@@ -104,9 +104,10 @@ if __name__ == '__main__':
     learning_rate=0.01
 
     # Create a SummaryWriter for logging
-    suffix = f"jnet_{epochs}e_{batch_size}b_{learning_rate}lr"
-    train_writer = SummaryWriter(log_dir="logs/train_logs", filename_suffix=suffix)
-    val_writer = SummaryWriter(log_dir="logs/val_logs", filename_suffix=suffix)
+    train_suffix = f"jnet_{epochs}e_{batch_size}b_{learning_rate}lr_train"
+    val_suffix   = f"jnet_{epochs}e_{batch_size}b_{learning_rate}lr_val"
+    train_writer = SummaryWriter(log_dir="logs/train_logs", filename_suffix=train_suffix)
+    val_writer   = SummaryWriter(log_dir="logs/val_logs", filename_suffix=val_suffix)
     
     train_model(
             model=model,
