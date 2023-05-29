@@ -7,8 +7,6 @@ from scipy.interpolate import RegularGridInterpolator
 from scipy import ndimage
 import warnings
 
-def stack_channels(npdata):
-    return np.stack([npdata["eps"], npdata["Re_Hy"], npdata["Im_Hy"]], axis=0)
 
 class MetaGratingDataLoader(Dataset):
     """Pytorch Dataset instance for loading Metagratings 2D dataset
@@ -21,19 +19,16 @@ class MetaGratingDataLoader(Dataset):
         self.lr_data_filename = lr_data_filename
         self.n_samp_pts = n_samp_pts
 
-        npdata_hr = np.load(hr_data_filename)
-        self.hr_data = stack_channels(npdata_hr)
+        self.hr_data = np.load(hr_data_filename, mmap_mode='r')
 
-        npdata_lr = np.load(lr_data_filename)
-        self.lr_data = stack_channels(npdata_lr)
+        self.lr_data = np.load(lr_data_filename, mmap_mode='r')
 
-        self.nc, self.n_samples, self.nx_hr, self.nz_hr = self.hr_data.shape
+        self.n_samples, self.nc, self.nx_hr, self.nz_hr = self.hr_data.shape
 
-        self.scale_hres = np.array([self.nx_hr, self.nz_hr])
         self.return_hres = return_hres
 
     def __len__(self):
-        return self.hr_data.shape[1]
+        return self.n_samples
 
     def __getitem__(self, idx):
         """Get the random cutout data cube corresponding to idx.
@@ -44,8 +39,9 @@ class MetaGratingDataLoader(Dataset):
         Returns:
           TODO
         """
-        hres_space = self.hr_data[:, idx, :, :] # [c, example_num, x, z]
-        lres_space = self.lr_data[:, idx, :, :]
+
+        lres_space = np.array(self.lr_data[idx])
+        hres_space = np.array(self.hr_data[idx])
 
         return_tensors = [lres_space]
 

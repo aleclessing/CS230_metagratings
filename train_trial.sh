@@ -1,0 +1,1 @@
+python train.py -r 1 -e 1 -b 128 -l .001

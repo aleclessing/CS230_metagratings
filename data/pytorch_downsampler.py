@@ -23,21 +23,21 @@ fields = ['Re_Hy', 'Im_Hy', 'eps']
 
 hr_data = np.empty((num_examples, len(fields), hr_nx, hr_nz))
 
-hr_data[:test_num_examples, 0, :, :] = test_data['Hy_fields'][:, 0, :, :]
-hr_data[:test_num_examples, 1, :, :] = test_data['Hy_fields'][:, 1, :, :]
-hr_data[:test_num_examples, 2, :, :]= test_data['structures'][:, 0, :, :]
+hr_data[:test_num_examples, 1, :, :] = test_data['Hy_fields'][:, 0, :, :]
+hr_data[:test_num_examples, 2, :, :] = test_data['Hy_fields'][:, 1, :, :]
+hr_data[:test_num_examples, 0, :, :]= test_data['structures'][:, 0, :, :]
 
-hr_data[test_num_examples:, 0, :, :] = train_data['Hy_fields'][:, 0, :, :]
-hr_data[test_num_examples:, 1, :, :] = train_data['Hy_fields'][:, 1, :, :]
-hr_data[test_num_examples:, 2, :, :]= train_data['structures'][:, 0, :, :]
+hr_data[test_num_examples:, 1, :, :] = train_data['Hy_fields'][:, 0, :, :]
+hr_data[test_num_examples:, 2, :, :] = train_data['Hy_fields'][:, 1, :, :]
+hr_data[test_num_examples:, 0, :, :]= train_data['structures'][:, 0, :, :]
 
 print(hr_data.shape)
 
 hr_data = torch.from_numpy(hr_data)
 
-weights = torch.ones((3, 3, downsamp, downsamp), dtype=torch.double)/(downsamp**2)
+weights = torch.ones((3, 1, downsamp, downsamp), dtype=torch.double)/(downsamp**2)
 
-lr_data = F.conv2d(hr_data, weight=weights, stride=2)
+lr_data = F.conv2d(hr_data, weight=weights, stride=2, groups=3)
 
-np.savez('lr_data', Re_Hy=lr_data[:,0,:, :], Im_Hy=lr_data[:,1,:, :], eps=lr_data[:,2,:, :])
-np.savez('hr_data', Re_Hy=hr_data[:,0,:, :], Im_Hy=hr_data[:,1,:, :], eps=hr_data[:,2,:, :])
+np.save('lr_data', lr_data)
+np.save('hr_data', hr_data)

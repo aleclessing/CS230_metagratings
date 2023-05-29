@@ -12,7 +12,8 @@ class JNet(nn.Module):
 
         self.unet = UNet(self.in_channels, 16)
         self.super_up = nn.ConvTranspose2d(self.in_channels + 16, 16, kernel_size=2, stride=2)
-        self.super_resblock = ResBlock(16, self.dynamic_channels)
+        self.super_resblock = ResBlock(16, 16)
+        self.final_layer = nn.ConvTranspose2d(16, self.dynamic_channels, kernel_size=1)
 
     def forward(self, x):
         x_orig = x
@@ -22,6 +23,7 @@ class JNet(nn.Module):
         x = self.super_up(x)
 
         x = self.super_resblock(x)
+        x = self.final_layer(x)
 
         return x
 

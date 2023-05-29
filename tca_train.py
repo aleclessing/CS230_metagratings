@@ -18,8 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer):
     
     # 1. Open Dataset
-    dataset = loader.MetaGratingDataLoader(return_hres=True, hr_data_filename='data/hr_data.npz', lr_data_filename='data/lr_data.npz')
-    # print(dataset[0]) # First sample out of 100 with information on the Re, Im, and eps 
+    dataset = loader.MetaGratingDataLoader(return_hres=True)
     
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * 0.1) # 90-10 split
@@ -27,7 +26,11 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     train_set, val_set = random_split(dataset, [n_train, n_val], generator=torch.Generator().manual_seed(0))
 
     # 3. Create data loaders
-    loader_args = dict(batch_size=batch_size, num_workers=os.cpu_count(), pin_memory=True, prefetch_factor=2)
+    loader_args = dict(batch_size=batch_size, pin_memory=False, multiprocessing_context="fork")
+    if device != 'cpu':
+        loader_args['num_workers'] = os.cpu_count()
+        loader_args['prefetch_factor'] = 2
+
     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
 
@@ -35,7 +38,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     weight_decay: float = 1e-8
     momentum: float = 0.99
 
-    optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-12, weight_decay=.01)
+    optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=.01)
     loss_fn = nn.MSELoss()
 
     global_step = 0
@@ -93,18 +96,33 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     # plt.show()
 
 
+def get_args():
+    parser = argparse.ArgumentParser(description='Running training on the Block JNet')
+    parser.add_argument('--rid', '-r', metavar='RUNID', nargs='+', help='Run ID', required=True)
+    parser.add_argument('--epochs', '-e', metavar='EPS', nargs='+', help='Number of epochs to train', required=True)
+    parser.add_argument('--batch', '-b', metavar='BATCHSIZE', nargs='+', help='Size of batch', required=True)
+    parser.add_argument('--lr', '-l', metavar='LR', nargs='+', help='Learning Rate', required=True)
+    
+    return parser.parse_args()
+
 if __name__ == '__main__':
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    args = get_args()
+
+    print(args.rid)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+    print(device)
     model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
 
     # Define hyperparameters
-    epochs=1
-    batch_size=100
-    learning_rate=.001
+    epochs=int(args.epochs[0])
+    batch_size=int(args.batch[0])
+    learning_rate=float(args.lr[0])
+    runID = int(args.rid[0])
 
     # Create a SummaryWriter for logging
-    suffix = f"jnet_{epochs}e_{batch_size}b_{learning_rate}lr"
+    suffix = f"jnet_runID{runID}"
     train_writer = SummaryWriter(log_dir="logs/train_logs", filename_suffix=suffix)
     val_writer = SummaryWriter(log_dir="logs/val_logs", filename_suffix=suffix)
     
@@ -120,7 +138,7 @@ if __name__ == '__main__':
     train_writer.flush()
     val_writer.flush()
     
-    torch.save(model.state_dict(), 'model.pth')
+    torch.save(model.state_dict(), 'model' + str(runID) + '.pth')
 
     # Close the SummaryWriter
     train_writer.close()
