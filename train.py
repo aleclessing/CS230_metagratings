@@ -27,7 +27,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     train_set, val_set = random_split(dataset, [n_train, n_val], generator=torch.Generator().manual_seed(0))
 
     # 3. Create data loaders
-    loader_args = dict(batch_size=batch_size, num_workers=os.cpu_count(), pin_memory=True)
+    loader_args = dict(batch_size=batch_size, num_workers=os.cpu_count(), pin_memory=True, prefetch_factor=2)
     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
 
@@ -35,7 +35,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     weight_decay: float = 1e-8
     momentum: float = 0.99
 
-    optimizer = optim.SGD(params = model.parameters(), lr=learning_rate, momentum=momentum)
+    optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-12, weight_decay=.01)
     loss_fn = nn.MSELoss()
 
     global_step = 0
@@ -99,9 +99,9 @@ if __name__ == '__main__':
     model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
 
     # Define hyperparameters
-    epochs=3 
-    batch_size=30
-    learning_rate=0.01
+    epochs=1
+    batch_size=100
+    learning_rate=.001
 
     # Create a SummaryWriter for logging
     suffix = f"jnet_{epochs}e_{batch_size}b_{learning_rate}lr"
