@@ -136,8 +136,7 @@ if __name__ == '__main__':
     suffix = f"jnet_runID{runID}"
     train_writer = SummaryWriter(log_dir="logs/train_logs", filename_suffix=suffix)
     val_writer = SummaryWriter(log_dir="logs/val_logs", filename_suffix=suffix)
-
-    #Text log file
+    
     lf = open('logs/txt_logs/'+str(runID)+'_log.txt', 'w+')
 
     model_name = 'model' + str(runID) + '.pth'
