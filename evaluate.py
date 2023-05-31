@@ -6,29 +6,18 @@ from predict import predict_img
 import jnet
 import torch
 from utils import plot_hr_lr_sr
-
+from sklearn.metrics import mean_squared_error
 
 def predictWithInterpolation(input_im, scaling=2):
     return scipy.ndimage.zoom(input_im, (1, scaling, scaling), order=1)
 
-
-if __name__ == '__main__':
-    exnum = 1 # example to be plotted
+def pltCompatisonsSamples(sampleNumber):
+    exnum = sampleNumber # example to be plotted
     model = "model1.pth" # SR model to be used
-
     # Interpolated data
     data = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)
     hr_im, lr_im = data[exnum]
     pred_hr_im = predictWithInterpolation(lr_im)[1:3,:,:] # Slice to keep Real and Imaginary interpolated fields
-    # print(pred_hr_im.shape)
-    # # PLT
-    # plt.imshow(pred_hr_im[2])
-    # plt.colorbar()
-    # plt.show()
-
-    # print(pred_hr_im.shape)
-    # print(np.max(lr_im))
-    # print(np.max(pred_hr_im))
 
     # Predicted data by model
     hr_img, lr_img = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)[int(exnum)]
@@ -37,49 +26,51 @@ if __name__ == '__main__':
     net.to(device=device)
     state_dict = torch.load(model, map_location=device)
     net.load_state_dict(state_dict)
-    sr_img = predict_img(net=net, lr_img=lr_img, device=device) # must first open a data file and read it into a numpy array
-    print(sr_img.shape)
-
+    sr_img = predict_img(net=net, lr_img=lr_img, device=device) # must first open a data file and read it into a numpy array    
     plot_hr_lr_sr(hr_img, lr_img, sr_img,pred_hr_im)
-    
-
-#     import torch
-# import torch.nn.functional as F
-# from tqdm import tqdm
-
-# from utils.dice_score import multiclass_dice_coeff, dice_coeff
 
 
-# @torch.inference_mode()
-# def evaluate(net, dataloader, device, amp):
-#     net.eval()
-#     num_val_batches = len(dataloader)
-#     dice_score = 0
+if __name__ == '__main__':
 
-#     # iterate over the validation set
-#     with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
-#         for batch in tqdm(dataloader, total=num_val_batches, desc='Validation round', unit='batch', leave=False):
-#             image, mask_true = batch['image'], batch['mask']
+    # pltCompatisonsSamples(1) #### PLOT ONE SAMPLE
 
-#             # move images and labels to correct device and type
-#             image = image.to(device=device, dtype=torch.float32, memory_format=torch.channels_last)
-#             mask_true = mask_true.to(device=device, dtype=torch.long)
+    # Evaluate Error from Interpolation and Predictions accross N samples
+    N = 100
+    x = list(range(N)) #Sample Number Array 
+    model = "model1.pth" # SR model to be used
+    ya1=[] #mse_pred_real
+    ya2=[] #mse_pred_imag
+    ya3=[] #mse_interp_real
+    ya4=[] #mse_interp_imag
+    for i in range(N):
+        # Interpolated data
+        data = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)
+        hr_im, lr_im = data[i]
+        pred_hr_im = predictWithInterpolation(lr_im)[1:3,:,:] # Slice to keep Real and Imaginary interpolated fields
+        # Predicted data by model
+        hr_img, lr_img = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)[int(i)]
+        net = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        net.to(device=device)
+        state_dict = torch.load(model, map_location=device)
+        net.load_state_dict(state_dict)
+        sr_img = predict_img(net=net, lr_img=lr_img, device=device) # must first open a data file and read it into a numpy array
+        ### CALCULATE ERROR ACCROSS A NUMBER OF SAMPLES
+        mse_pred_real = mean_squared_error(sr_img[0], hr_img[0]) #Real Fields Predicted
+        mse_pred_imag = mean_squared_error(sr_img[1], hr_img[1]) #Imag Fields Predicted
+        mse_interp_real = mean_squared_error(pred_hr_im[0], hr_img[0]) #Real Fields Interpolated
+        mse_interp_imag = mean_squared_error(pred_hr_im[1], hr_img[1]) #Imag Fields Interpolated
+        ya1.append(mse_pred_real)
+        ya2.append(mse_pred_imag)
+        ya3.append(mse_interp_real)
+        ya4.append(mse_interp_imag)
 
-#             # predict the mask
-#             mask_pred = net(image)
+    xarr = np.array([[x],[x],[x],[x]])
+    yarr = np.array([[ya1],[ya2],[ya3],[ya4]])
 
-#             if net.n_classes == 1:
-#                 assert mask_true.min() >= 0 and mask_true.max() <= 1, 'True mask indices should be in [0, 1]'
-#                 mask_pred = (F.sigmoid(mask_pred) > 0.5).float()
-#                 # compute the Dice score
-#                 dice_score += dice_coeff(mask_pred, mask_true, reduce_batch_first=False)
-#             else:
-#                 assert mask_true.min() >= 0 and mask_true.max() < net.n_classes, 'True mask indices should be in [0, n_classes['
-#                 # convert to one-hot format
-#                 mask_true = F.one_hot(mask_true, net.n_classes).permute(0, 3, 1, 2).float()
-#                 mask_pred = F.one_hot(mask_pred.argmax(dim=1), net.n_classes).permute(0, 3, 1, 2).float()
-#                 # compute the Dice score, ignoring background
-#                 dice_score += multiclass_dice_coeff(mask_pred[:, 1:], mask_true[:, 1:], reduce_batch_first=False)
-
-#     net.train()
-#     return dice_score / max(num_val_batches, 1)
+    for i in range(4):
+        plt.plot(xarr[i,0], yarr[i,0])
+    plt.xlabel("Sample Number")
+    plt.ylabel("MSE Error")
+    plt.gca().legend(('mse_pred_real','mse_pred_imag','mse_interp_real','mse_interp_imag'))
+    plt.show()
