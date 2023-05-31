@@ -37,4 +37,5 @@ def plot_hr_lr_sr(hr_data, lr_data, sr_data, int_data=None):
         axs[3, 1].imshow(int_data[1, :, :])
         axs[3, 1].set_title('Int Im(Hy)')
 
+    plt.savefig('pred.png')
     plt.show()
