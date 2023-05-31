@@ -29,11 +29,7 @@ def pltCompatisonsSamples(sampleNumber):
     sr_img = predict_img(net=net, lr_img=lr_img, device=device) # must first open a data file and read it into a numpy array    
     plot_hr_lr_sr(hr_img, lr_img, sr_img,pred_hr_im)
 
-
-if __name__ == '__main__':
-
-    # pltCompatisonsSamples(1) #### PLOT ONE SAMPLE
-
+def pltMSEError(N):
     # Evaluate Error from Interpolation and Predictions accross N samples
     N = 100
     x = list(range(N)) #Sample Number Array 
@@ -89,3 +85,13 @@ if __name__ == '__main__':
     
     plt.suptitle("MSE Errors for Predicted and Interpolated Values")
     plt.show()
+    
+
+
+if __name__ == '__main__':
+
+    # pltCompatisonsSamples(1) #### PLOT ONE SAMPLE
+    
+    pltMSEError(100)
+
+    
