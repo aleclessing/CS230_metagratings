@@ -65,12 +65,25 @@ if __name__ == '__main__':
         ya3.append(mse_interp_real)
         ya4.append(mse_interp_imag)
 
-    xarr = np.array([[x],[x],[x],[x]])
-    yarr = np.array([[ya1],[ya2],[ya3],[ya4]])
-
-    for i in range(4):
+    #plot 1: Real Fields
+    xarr = np.array([[x],[x]])
+    yarr = np.array([[ya1],[ya3]])
+    for i in range(2):
+        plt.subplot(1, 2, 1)
         plt.plot(xarr[i,0], yarr[i,0])
     plt.xlabel("Sample Number")
     plt.ylabel("MSE Error")
-    plt.gca().legend(('mse_pred_real','mse_pred_imag','mse_interp_real','mse_interp_imag'))
+    plt.gca().legend(('mse_pred_real','mse_interp_real'))
+
+    #plot 2: Imaginary Fields
+    xarr = np.array([[x],[x]])
+    yarr = np.array([[ya2],[ya4]])
+    for i in range(2):
+        plt.subplot(1, 2, 2)
+        plt.plot(xarr[i,0], yarr[i,0])
+    plt.xlabel("Sample Number")
+    plt.ylabel("MSE Error")
+    plt.gca().legend(('mse_pred_imag','mse_interp_imag'))
+    
+    plt.suptitle("MSE Errors for Predicted and Interpolated Values")
     plt.show()
