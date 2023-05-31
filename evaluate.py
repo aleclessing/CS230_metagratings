@@ -8,18 +8,21 @@ import torch
 from utils import plot_hr_lr_sr
 
 
-def predict(input_im, scaling=2):
+def predictWithInterpolation(input_im, scaling=2):
     return scipy.ndimage.zoom(input_im, (1, scaling, scaling), order=1)
 
 
 if __name__ == '__main__':
+    exnum = 1 # example to be plotted
+    model = "model1.pth" # SR model to be used
 
     # Interpolated data
     data = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)
-    hr_im, lr_im = data[29999]
-    pred_hr_im = predict(lr_im)
-    # PLT
-    # plt.imshow(pred_hr_im[0])
+    hr_im, lr_im = data[exnum]
+    pred_hr_im = predictWithInterpolation(lr_im)[1:3,:,:] # Slice to keep Real and Imaginary interpolated fields
+    # print(pred_hr_im.shape)
+    # # PLT
+    # plt.imshow(pred_hr_im[2])
     # plt.colorbar()
     # plt.show()
 
@@ -28,9 +31,6 @@ if __name__ == '__main__':
     # print(np.max(pred_hr_im))
 
     # Predicted data by model
-    # python predict.py -e 1 -m model1.pth
-    exnum = 1
-    model = "model1.pth"
     hr_img, lr_img = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)[int(exnum)]
     net = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -38,7 +38,9 @@ if __name__ == '__main__':
     state_dict = torch.load(model, map_location=device)
     net.load_state_dict(state_dict)
     sr_img = predict_img(net=net, lr_img=lr_img, device=device) # must first open a data file and read it into a numpy array
-    plot_hr_lr_sr(hr_img, lr_img, sr_img)
+    print(sr_img.shape)
+
+    plot_hr_lr_sr(hr_img, lr_img, sr_img,pred_hr_im)
     
 
 #     import torch

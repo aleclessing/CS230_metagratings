@@ -12,7 +12,7 @@ def plot_hr_lr_sr(hr_data, lr_data, sr_data, int_data=None):
         Note: the 3 channels are permitivities and the Re and Im parts of the 
         Hy field.
     """
-    if not int_data:
+    if int_data is None:
         num_rows = 3
     else:
         num_rows = 4
@@ -31,7 +31,7 @@ def plot_hr_lr_sr(hr_data, lr_data, sr_data, int_data=None):
     axs[2, 0].set_title('SR Re(Hy)')
     axs[2, 1].imshow(sr_data[1, :, :])
     axs[2, 1].set_title('SR Im(Hy)')
-    if int_data:
+    if int_data is not None:
         axs[3, 0].imshow(int_data[0, :, :])
         axs[3, 0].set_title('Int Re(Hy)')
         axs[3, 1].imshow(int_data[1, :, :])
