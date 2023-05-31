@@ -73,6 +73,7 @@ if __name__ == '__main__':
         plt.plot(xarr[i,0], yarr[i,0])
     plt.xlabel("Sample Number")
     plt.ylabel("MSE Error")
+    plt.title("Real Fields")
     plt.gca().legend(('mse_pred_real','mse_interp_real'))
 
     #plot 2: Imaginary Fields
@@ -83,6 +84,7 @@ if __name__ == '__main__':
         plt.plot(xarr[i,0], yarr[i,0])
     plt.xlabel("Sample Number")
     plt.ylabel("MSE Error")
+    plt.title("Imaginary Fields")
     plt.gca().legend(('mse_pred_imag','mse_interp_imag'))
     
     plt.suptitle("MSE Errors for Predicted and Interpolated Values")
