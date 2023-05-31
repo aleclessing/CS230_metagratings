@@ -15,6 +15,25 @@ from unet import UNet
 
 from torch.utils.tensorboard import SummaryWriter
 
+"""
+def mse_loss(input, target):
+    return torch.sum((input - target)**2) / input.data.nelement()
+
+def pde_loss(input, target):
+    # Compute the spatial second derivative of Hy_real using central differences
+    d2Hy_dx2 = (input[1:-1, 2:] - 2 * input[1:-1, 1:-1] + input[1:-1, :-2]) / dx**2
+    
+    # Compute the PDE loss
+    pde_loss = omega * mu0 * input[1:-1, 1:-1] - d2Hy_dx2
+    pde_loss /= permittivities[1:-1, 1:-1]
+    # Should we square this or take its absolute value?
+    return torch.sum(pde_loss**2) / pde_loss.data.nelement()
+
+def total_loss(input, target, alpha=1.0, beta=1.0):
+    return alpha*mse_loss(input, target) + beta*pde_loss(input, target)
+"""
+
+
 def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None):
     
     # 1. Open Dataset
