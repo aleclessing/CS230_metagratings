@@ -22,7 +22,6 @@ def mse_loss(input, target):
 def pde_loss(input, target):
     # Compute the spatial second derivative of Hy_real using central differences
     d2Hy_dx2 = (input[1:-1, 2:] - 2 * input[1:-1, 1:-1] + input[1:-1, :-2]) / dx**2
-    
     # Compute the PDE loss
     pde_loss = omega * mu0 * input[1:-1, 1:-1] - d2Hy_dx2
     pde_loss /= permittivities[1:-1, 1:-1]
@@ -32,6 +31,27 @@ def pde_loss(input, target):
 def total_loss(input, target, alpha=1.0, beta=1.0):
     return alpha*mse_loss(input, target) + beta*pde_loss(input, target)
 """
+
+class CustomLoss(torch.nn.Module):
+    def __init__(self, alpha, beta, omega, mu0, permittivities, dx):
+        super(CustomLoss, self).__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.omega = omega
+        self.mu0 = mu0
+        self.permittivities = permittivities
+        self.dx = dx
+
+    def forward(self, input, target):
+        mse_loss = torch.mean((input - target)**2)
+
+        d2Hy_dx2 = (input[1:-1, 2:] - 2 * input[1:-1, 1:-1] + input[1:-1, :-2]) / self.dx**2
+        pde_loss = self.omega * self.mu0 * input[1:-1, 1:-1] - d2Hy_dx2
+        pde_loss /= self.permittivities[1:-1, 1:-1]
+        pde_loss_mae = torch.mean(torch.abs(pde_loss))
+
+        total_loss = self.alpha * mse_loss + self.beta * pde_loss_mae
+        return total_loss
 
 
 def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None):
@@ -57,7 +77,9 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     weight_decay: float = 1e-8
 
     optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=.01)
-    loss_fn = nn.MSELoss()
+    alpha = 1.0
+    beta = 0.0
+    loss_fn = CustomLoss(alpha, beta)
 
     global_step = 0
 
@@ -75,6 +97,10 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
             metagratings, ground_truth = batch[1], batch[0] # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
             y_hat = model(metagratings)
             train_loss = loss_fn(y_hat,ground_truth)
+            print("y_hat type", type(y_hat))
+            print("ground_truth type", type(ground_truth))
+            print("y_hat shape", y_hat.shape)
+            print("ground_truth shape", ground_truth.shape)
             train_writer.add_scalar("Loss", train_loss, epoch)
             print("training loss", train_loss.item())
             train_loss.backward()
