@@ -14,7 +14,7 @@ import jnet
 
 from torch.utils.tensorboard import SummaryWriter
 
-def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None, scale_factor=2):
+def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01, gamma=0.9):
     
     # 1. Open Dataset
     dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy')
@@ -36,7 +36,8 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     weight_decay: float = 1e-8
 
-    optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=.01)
+    optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=weight_decay)
+    scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
     loss_fn = nn.MSELoss()
 
     global_step = 0
@@ -52,12 +53,12 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
             optimizer.zero_grad(set_to_none=True)
             print("processing training batch " + str(train_batchcount))
             
-            hr_eps, lr_fields, hr_fields = batch # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
+            hr_eps, lr_fields, hr_fields = batch
 
             pred_hr_fields = model(lr_fields, hr_eps)
             train_loss = loss_fn(pred_hr_fields, hr_fields)
 
-            train_writer.add_scalar("Loss", train_loss, epoch)
+            #train_writer.add_scalar("Loss", train_loss, epoch)
             print("training loss", train_loss.item())
             train_loss.backward()
 
@@ -71,7 +72,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
 
         avg_train_loss = sum(train_batch_loss) / train_batchcount
         train_loss_values.append(avg_train_loss)
-        train_writer.add_scalar("Avg Loss", avg_train_loss, epoch)
+        #train_writer.add_scalar("Avg Loss", avg_train_loss, epoch)
 
         # Evaluate the model on the validation set
         model.eval() # sets the model to evaluation mode
@@ -81,17 +82,17 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
             for batch in val_loader:
                 print("processing val batch " + str(val_batchcount))
                 
-                hr_eps, lr_fields, hr_fields = batch # batch[0] HR, batch[1] LR, batch[2] point coord Samples, batch[3] point_value
+                hr_eps, lr_fields, hr_fields = batch
 
                 pred_hr_fields = model(lr_fields, hr_eps)
 
                 val_loss = loss_fn(pred_hr_fields, hr_fields) 
-                val_writer.add_scalar("Loss", val_loss, epoch)
+                #val_writer.add_scalar("Loss", val_loss, epoch)
                 print("val loss", val_loss.item())
                 val_batch_loss.append(val_loss.item())
 
             avg_val_loss = sum(val_batch_loss) / val_batchcount
-            val_writer.add_scalar("Avg Loss", avg_val_loss, epoch)
+            #val_writer.add_scalar("Avg Loss", avg_val_loss, epoch)
 
             if txt_log != None:
                 print('val ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' loss ' + str(val_loss.item()), file=txt_log, flush=True)
@@ -101,16 +102,6 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
         torch.save(model.state_dict(), model_name)
 
 
-    # Replaced with tensorboard logging
-    # x_data = list(range(epochs))
-    # # Plot loss function
-    # plt.scatter(x_data, train_loss_values, c='r', label='data')
-    # plt.xlabel('epoch')
-    # plt.ylabel('loss')
-    # plt.title('Training Loss')
-    # plt.show()
-
-
 def get_args():
     parser = argparse.ArgumentParser(description='Running training on the Block JNet')
     parser.add_argument('--run_name', '-r', metavar='RUNNAME', nargs='+', help='Run Name', required=True)
@@ -118,12 +109,13 @@ def get_args():
     parser.add_argument('--batch', '-b', metavar='BATCHSIZE', nargs='+', help='Size of batch', required=True)
     parser.add_argument('--lr', '-l', metavar='LR', nargs='+', help='Learning Rate', required=True)
     parser.add_argument('--scaling_factor', '-s', metavar='SCALEFACTOR', nargs='+', help='Scaling factor (amount of upsampling to do)', required=True)
+    parser.add_argument('--weight_decay', '-w', metavar='WEIGHTDECAY', nargs='+', help='Weight Decay', required=True)
+    parser.add_argument('--gamma', '-g', metavar='GAMMA', nargs='+', help='Learning Rate Decay Rate', required=True)
     
     return parser.parse_args()
 
 if __name__ == '__main__':
 
-    
     device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
     print("Using Device:", device)
     
@@ -134,14 +126,16 @@ if __name__ == '__main__':
     learning_rate=float(args.lr[0])
     run_name = args.run_name[0]
     scale_factor = int(args.scaling_factor[0])
+    weight_decay = float(args.weight_decay[0])
+    gamma = float(args.gamma[0])
 
     #Create Model
     model = jnet.TCAJNet(upsampling_layers=int(np.log2(scale_factor)))
 
     # Create a SummaryWriter for logging
     suffix = f"jnet_run_name_{run_name}"
-    train_writer = SummaryWriter(log_dir="logs/train_logs", filename_suffix=suffix)
-    val_writer = SummaryWriter(log_dir="logs/val_logs", filename_suffix=suffix)
+    train_writer = None#SummaryWriter(log_dir="logs/train_logs", filename_suffix=suffix)
+    val_writer = None#SummaryWriter(log_dir="logs/val_logs", filename_suffix=suffix)
     
     lf = open('logs/txt_logs/'+str(run_name)+'_log.txt', 'w+')
 
@@ -159,14 +153,14 @@ if __name__ == '__main__':
             txt_log=lf,
             scale_factor=scale_factor)
    
-    train_writer.flush()
-    val_writer.flush()
+    #train_writer.flush()
+    #val_writer.flush()
     
     torch.save(model.state_dict(), model_name)
 
     # Close the SummaryWriter
-    train_writer.close()
-    val_writer.close()
+    #train_writer.close()
+    #val_writer.close()
 
 # To see the tensorboard logs, run the following command in the terminal:
 # tensorboard --logdir=logs

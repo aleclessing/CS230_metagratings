@@ -31,8 +31,6 @@ class TCAJNet(nn.Module):
 
     def forward(self, lr_fields, hr_eps):
 
-        print(lr_fields.shape, hr_eps.shape)
-
         eps_encodings = [hr_eps.unsqueeze(1)]
 
         for i in range(self.upsampling_layers):
