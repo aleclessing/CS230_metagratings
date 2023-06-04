@@ -6,7 +6,7 @@ import numpy as np
 
 class ContDecoder(nn.Module):
 
-    def __init__(self, context_channels=32, coord_channels=2, output_channels=2, hidden_layer_features=[32, 16], static_channels=1):
+    def __init__(self, context_channels=32, coord_channels=2, output_channels=2, hidden_layer_features=[516, 256, 128, 64, 32, 16], static_channels=1):
         super().__init__()
 
         self.context_channels = context_channels

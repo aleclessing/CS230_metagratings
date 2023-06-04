@@ -16,16 +16,22 @@ def predict_fields(net, lr_fields, hr_eps, pt_coos):
     hr_eps = torch.tensor(hr_eps).unsqueeze(0)
     pt_coos = torch.tensor(pt_coos).unsqueeze(0)
 
+    print(lr_fields.shape, hr_eps.shape, pt_coos.shape)
     sr_fields = net(lr_fields, hr_eps, pt_coos)
 
-    return sr_fields.detach().numpy()[0]
+    print(sr_fields.shape)
+
+    return sr_fields
 
 
-def predict_plot(net, lr_fields, hr_fields, pt_coos, pt_vals, sr_vals):
+def diagnose(pt_vals, pt_coos, sr_vals):
+    print(np.sqrt(np.mean((pt_vals.detach().numpy()-sr_pt_fields.detach().numpy())**2)))
+
+
+def predict_plot(lr_fields, hr_fields, pt_coos, pt_vals, sr_vals):
     import matplotlib.pyplot as plt
-    fig, axs = plt.subplots(1, 2)
+    fig, axs = plt.subplots(1, 2, figsize=(15, 8))
     plt.imshow(hr_fields[0])
-
 
     cbar = plt.colorbar()
     color_func = lambda num: cbar.cmap((num - cbar.vmin)/(cbar.vmax - cbar.vmin))
@@ -33,15 +39,12 @@ def predict_plot(net, lr_fields, hr_fields, pt_coos, pt_vals, sr_vals):
     xs = ((1+pt_coos[:, 0])/2)*hr_fields[0].shape[0]
     zs = ((1+pt_coos[:, 1])/2)*hr_fields[0].shape[1]
 
-    print(xs.shape, sr_vals.shape)
-
-    print(sr_vals[:,0])
-
+    
     axs[1].scatter(x=zs, y=xs, c=color_func(sr_vals[:,0]), s=100, edgecolors='black')
 
     axs[0].scatter(pt_vals[:,0], sr_vals[:,0])
 
-    plt.show()
+    plt.savefig('latest_train_plot.png')
 
 
 def get_args():
@@ -60,15 +63,26 @@ def get_args():
 if __name__ == '__main__':
     args = get_args()
 
+    scale_factor = 8
+
     hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=20 )[int(args.exnum[0])]
 
-    net = cont_jnet.ContJNet( static_channels=1, dynamic_channels=2, upsampling_layers=3)
+    net = cont_jnet.ContJNet(upsampling_layers=int(np.log2(scale_factor)))
 
-    state_dict = torch.load(args.model)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    net.to(device=device)
+    state_dict = torch.load(args.model, map_location=device)
     net.load_state_dict(state_dict)
 
     # must first open a data file and read it into a numpy array
     sr_pt_fields = predict_fields(net, lr_fields, hr_eps, pt_coos)
 
+    pt_vals = torch.tensor(pt_vals)
+    pt_vals = pt_vals.unsqueeze(0)
+    print("pt_vals", pt_vals.shape)
+
+    diagnose(pt_vals, pt_coos, sr_pt_fields)
+
     if args.viz:
-        predict_plot(net, lr_fields, hr_fields, pt_coos, pt_vals, sr_pt_fields)
+        pass#predict_plot(net, lr_fields, hr_fields, pt_coos, pt_vals, sr_pt_fields)

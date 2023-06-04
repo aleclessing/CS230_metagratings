@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 import dataloader as loader
 import cont_jnet
+from predict_cont import predict_plot
 
 #from torch.utils.tensorboard import SummaryWriter
 
@@ -55,8 +56,13 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
             
             hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
 
-            pred_pt_hr_fields = model(lr_fields, hr_eps, pt_coos)
-            train_loss = loss_fn(pred_pt_hr_fields, pt_vals)
+            print(lr_fields.shape, hr_eps.shape, pt_coos.shape)
+            sr_pt_fields = model(lr_fields, hr_eps, pt_coos)
+            print(sr_pt_fields.shape)
+            train_loss = loss_fn(sr_pt_fields, pt_vals)
+    
+            print("pt_vals", pt_vals.shape)
+            print(np.sqrt(np.mean((pt_vals.detach().numpy()-sr_pt_fields.detach().numpy())**2)))
 
             #train_writer.add_scalar("Loss", train_loss, epoch)
             print("training loss", train_loss.item())
@@ -67,8 +73,10 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
             train_batch_loss.append(train_loss.item())
             if txt_log != None:
                 print('train ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' loss ' + str(train_loss.item()), file=txt_log, flush=True)
+                predict_plot(lr_fields[0].detach().numpy(), hr_fields[0].detach().numpy(), pt_coos[0].detach().numpy(), pt_vals[0].detach().numpy(), sr_pt_fields[0].detach().numpy())
 
             train_batchcount+=1
+            torch.save(model.state_dict(), model_name) #TODO: temporary for testing
 
         scheduler.step()
         avg_train_loss = sum(train_batch_loss) / train_batchcount
@@ -85,8 +93,8 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
                 
                 hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
 
-                pred_pt_hr_fields = model(lr_fields, hr_eps, pt_coos)
-                val_loss = loss_fn(pred_pt_hr_fields, pt_vals)
+                sr_pt_fields = model(lr_fields, hr_eps, pt_coos)
+                val_loss = loss_fn(sr_pt_fields, pt_vals)
 
                 #val_writer.add_scalar("Loss", val_loss, epoch)
                 print("val loss", val_loss.item())
@@ -112,6 +120,7 @@ def get_args():
     parser.add_argument('--scaling_factor', '-s', metavar='SCALEFACTOR', nargs='+', help='Scaling factor (amount of upsampling to do)', required=True)
     parser.add_argument('--weight_decay', '-w', metavar='WEIGHTDECAY', nargs='+', help='Weight Decay', required=True)
     parser.add_argument('--gamma', '-g', metavar='GAMMA', nargs='+', help='Learning Rate Decay Rate', required=True)
+    parser.add_argument('--continue_training', '-c', action='store_true', help='Continue Training Model', default=False)
     
     return parser.parse_args()
 
@@ -129,6 +138,7 @@ if __name__ == '__main__':
     scale_factor = int(args.scaling_factor[0])
     weight_decay = float(args.weight_decay[0])
     gamma = float(args.gamma[0])
+    cont = args.continue_training
 
     #Create Model
     model = cont_jnet.ContJNet(upsampling_layers=int(np.log2(scale_factor)))
@@ -141,6 +151,11 @@ if __name__ == '__main__':
     lf = open('logs/txt_logs/'+str(run_name)+'_log.txt', 'w+')
 
     model_name = 'models/model_' + run_name + '.pth'
+
+    if cont:
+        print("cont")
+        state_dict = torch.load(model_name)
+        model.load_state_dict(state_dict)
     
     train_model(
             model=model,
