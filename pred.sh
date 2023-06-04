@@ -1,1 +1,1 @@
-python predict.py -e 1 -m model1.pth
+python predict.py -e 1 -m models/model_test_downsamp8.pth

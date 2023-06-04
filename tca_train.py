@@ -1,6 +1,6 @@
 import argparse
-import jnet
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import torch
 import torch.nn.functional as F
@@ -10,15 +10,14 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 import dataloader as loader
-from jnet import JNet
-from unet import UNet
+import jnet
 
 from torch.utils.tensorboard import SummaryWriter
 
-def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None):
+def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None, scale_factor=2):
     
     # 1. Open Dataset
-    dataset = loader.MetaGratingDataLoader(return_hres=True)
+    dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy')
     
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * 0.1) # 90-10 split
@@ -109,37 +108,39 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
 
 def get_args():
     parser = argparse.ArgumentParser(description='Running training on the Block JNet')
-    parser.add_argument('--rid', '-r', metavar='RUNID', nargs='+', help='Run ID', required=True)
+    parser.add_argument('--run_name', '-r', metavar='RUNNAME', nargs='+', help='Run Name', required=True)
     parser.add_argument('--epochs', '-e', metavar='EPS', nargs='+', help='Number of epochs to train', required=True)
     parser.add_argument('--batch', '-b', metavar='BATCHSIZE', nargs='+', help='Size of batch', required=True)
     parser.add_argument('--lr', '-l', metavar='LR', nargs='+', help='Learning Rate', required=True)
+    parser.add_argument('--scaling_factor', '-s', metavar='SCALEFACTOR', nargs='+', help='Scaling factor (amount of upsampling to do)', required=True)
     
     return parser.parse_args()
 
 if __name__ == '__main__':
 
-    args = get_args()
-
-    print(args.rid)
-
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
-    print(device)
-    model = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
-
-    # Define hyperparameters
+    print("Using Device:", device)
+    
+    # Get hyperparameters
+    args = get_args()
     epochs=int(args.epochs[0])
     batch_size=int(args.batch[0])
     learning_rate=float(args.lr[0])
-    runID = int(args.rid[0])
+    run_name = args.run_name[0]
+    scale_factor = int(args.scaling_factor[0])
+
+    #Create Model
+    model = jnet.TCAJNet(upsampling_layers=int(np.log2(scale_factor)))
 
     # Create a SummaryWriter for logging
-    suffix = f"jnet_runID{runID}"
+    suffix = f"jnet_run_name_{run_name}"
     train_writer = SummaryWriter(log_dir="logs/train_logs", filename_suffix=suffix)
     val_writer = SummaryWriter(log_dir="logs/val_logs", filename_suffix=suffix)
     
-    lf = open('logs/txt_logs/'+str(runID)+'_log.txt', 'w+')
+    lf = open('logs/txt_logs/'+str(run_name)+'_log.txt', 'w+')
 
-    model_name = 'model' + str(runID) + '.pth'
+    model_name = 'models/model_' + run_name + '.pth'
     
     train_model(
             model=model,
@@ -150,7 +151,8 @@ if __name__ == '__main__':
             train_writer=train_writer,
             val_writer=val_writer,
             model_name=model_name,
-            txt_log=lf)
+            txt_log=lf,
+            scale_factor=scale_factor)
    
     train_writer.flush()
     val_writer.flush()

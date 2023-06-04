@@ -68,11 +68,11 @@ if __name__ == '__main__':
     # in_files = args.input
 
 
-    hr_img, lr_img = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)[int(args.exnum[0])]
+    hr_img, lr_img = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0, )[int(args.exnum[0])]
 
     #out_files = get_output_filenames(args)
 
-    net = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
+    net = jnet.TCAJNet( static_channels=1, dynamic_channels=2, upsampling_layers=3)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     #logging.info(f'Loading model {args.model}')

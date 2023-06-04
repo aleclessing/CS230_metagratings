@@ -13,7 +13,7 @@ class MetaGratingDataLoader(Dataset):
     Loads 
     """
 
-    def __init__(self, hr_data_filename='data/hr_data.npy', lr_data_filename= 'data/lr_data.npy', n_samp_pts=0, return_hres=False):
+    def __init__(self, hr_data_filename='data/metanet_hr_data.npy', lr_data_filename='data/metanet_lr_data_downsamp8.npy', n_samp_pts=0, return_hres=False):
         
         self.hr_data_filename = hr_data_filename
         self.lr_data_filename = lr_data_filename
@@ -43,7 +43,7 @@ class MetaGratingDataLoader(Dataset):
         lres_space = np.array(self.lr_data[idx])
         hres_space = np.array(self.hr_data[idx])
 
-        return_tensors = [lres_space]
+        return_tensors = [lres_space] #always return hres epsilon grid
 
         if self.n_samp_pts != 0:
             x_grid_pts = 2*(np.arange(self.nx_hr) + 0.5)/self.nx_hr-1
