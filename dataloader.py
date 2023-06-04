@@ -43,7 +43,7 @@ class MetaGratingDataLoader(Dataset):
         lres_space = np.array(self.lr_data[idx])
         hres_space = np.array(self.hr_data[idx])
 
-        return_tensors = [lres_space] #always return hres epsilon grid
+        return_tensors = [hres_space[0], lres_space[1:]] #always return hres epsilon grid
 
         if self.n_samp_pts != 0:
             x_grid_pts = 2*(np.arange(self.nx_hr) + 0.5)/self.nx_hr-1
@@ -60,11 +60,10 @@ class MetaGratingDataLoader(Dataset):
             return_tensors = return_tensors + [point_coord, point_value[:,1:]]
 
         if self.return_hres:
-            return_tensors = [hres_space[1:]] + return_tensors #remove eps channel from hres_space
+            return_tensors = return_tensors + [hres_space[1:]] #remove eps channel from hres_space
 
         # cast everything to float32
         return_tensors = [t.astype(np.float32) for t in return_tensors]
-
 
         return tuple(return_tensors)
 

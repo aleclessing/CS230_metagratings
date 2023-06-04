@@ -15,7 +15,7 @@ import dataloader
 # and the hr truth is a 3D array [2, 64, 256] (permitivities have been removed).
 # For the time being, we will not do any preprocessing of the input image
 
-def predict_img(net, lr_img, device):
+def predict_img(net, lr_img, hr_eps, device):
     """
     Predicts the output image given the input image and the network model.
 
@@ -30,9 +30,12 @@ def predict_img(net, lr_img, device):
     net.eval()
     lr_img = lr_img
     lr_img = torch.tensor(lr_img).unsqueeze(0)
+    hr_eps = torch.tensor(hr_eps).unsqueeze(0)
+
+    print(hr_eps.shape, lr_img.shape)
 
     with torch.no_grad(): # sets up context where no gradient computation is performed
-        output = net(lr_img).cpu() # passes img thru the nn model to obtain output logits / probabilities
+        output = net(lr_img, hr_eps).cpu()
     
     return output.squeeze(0).numpy() 
 
@@ -67,8 +70,7 @@ if __name__ == '__main__':
     # truth_files = args.truth
     # in_files = args.input
 
-
-    hr_img, lr_img = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0, )[int(args.exnum[0])]
+    hr_eps, lr_fields, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0, )[int(args.exnum[0])]
 
     #out_files = get_output_filenames(args)
 
@@ -85,7 +87,7 @@ if __name__ == '__main__':
     #logging.info('Model loaded!')
 
     # must first open a data file and read it into a numpy array
-    sr_img = predict_img(net=net, lr_img=lr_img, device=device)
+    sr_img = predict_img(net=net, lr_img=lr_fields, hr_eps=hr_eps, device=device)
 
     if not args.no_save:
         pass
@@ -95,4 +97,4 @@ if __name__ == '__main__':
 
     if args.viz:
         #logging.info(f'Visualizing results for image {filename}, close to continue...')
-        plot_hr_lr_sr(hr_img, lr_img, sr_img)
+        plot_hr_lr_sr(hr_fields, lr_fields, sr_img)

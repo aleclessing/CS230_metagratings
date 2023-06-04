@@ -2,7 +2,7 @@ import scipy.ndimage
 import numpy as np
 import dataloader as loader
 import matplotlib.pyplot as plt
-from predict import predict_img
+from predict_tca import predict_img
 import jnet
 import torch
 from utils import plot_hr_lr_sr

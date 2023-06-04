@@ -1,1 +1,1 @@
-python predict.py -e 1 -m models/model_test_downsamp8.pth
+python predict_tca.py -e 100 -m models/model_test_downsamp8.pth

@@ -14,7 +14,7 @@ import jnet
 
 from torch.utils.tensorboard import SummaryWriter
 
-def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None, scale_factor=2):
+def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01):
     
     # 1. Open Dataset
     dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy')
@@ -36,7 +36,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     weight_decay: float = 1e-8
 
-    optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=.01)
+    optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=weight_decay)
     loss_fn = nn.MSELoss()
 
     global_step = 0
@@ -118,12 +118,12 @@ def get_args():
     parser.add_argument('--batch', '-b', metavar='BATCHSIZE', nargs='+', help='Size of batch', required=True)
     parser.add_argument('--lr', '-l', metavar='LR', nargs='+', help='Learning Rate', required=True)
     parser.add_argument('--scaling_factor', '-s', metavar='SCALEFACTOR', nargs='+', help='Scaling factor (amount of upsampling to do)', required=True)
-    
+    parser.add_argument('--weight_decay', '-w', metavar='WEIGHTDECAY', nargs='+', help='L2 Reg Weight Decay', required=True)
+
     return parser.parse_args()
 
 if __name__ == '__main__':
 
-    
     device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
     print("Using Device:", device)
     
@@ -134,6 +134,7 @@ if __name__ == '__main__':
     learning_rate=float(args.lr[0])
     run_name = args.run_name[0]
     scale_factor = int(args.scaling_factor[0])
+    weight_decay = float(args.weight_decay[0])
 
     #Create Model
     model = jnet.TCAJNet(upsampling_layers=int(np.log2(scale_factor)))
@@ -157,7 +158,8 @@ if __name__ == '__main__':
             val_writer=val_writer,
             model_name=model_name,
             txt_log=lf,
-            scale_factor=scale_factor)
+            scale_factor=scale_factor,
+            weight_decay=weight_decay)
    
     train_writer.flush()
     val_writer.flush()
