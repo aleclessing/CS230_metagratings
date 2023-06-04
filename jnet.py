@@ -16,7 +16,10 @@ class TCAJNet(nn.Module):
 
         self.num_downsamp_static_channels = min(8, self.static_channels*2**self.upsampling_layers)
 
-        self.unet = UNet(self.dynamic_channels + self.num_downsamp_static_channels, 16)
+        prune_unet = False
+        if upsampling_layers > 3:
+            prune_unet = True
+        self.unet = UNet(self.dynamic_channels + self.num_downsamp_static_channels, 16, prune_depth=prune_unet)
 
         self.upsamp_convs = []
         self.upsamp_resblocks = []

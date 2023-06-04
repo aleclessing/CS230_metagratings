@@ -14,8 +14,7 @@ from cont_jnet import ContJNet
 def train_model(model, epochs, batch_size, learning_rate, device):
     
     # 1. Open Dataset
-    dataset = loader.MetaGratingDataLoader(hr_data_filename='data/hr_data.npz', lr_data_filename='data/lr_data.npz', n_samp_pts=1024)
-    # print(dataset[0]) # First sample out of 100 with information on the Re, Im, and eps 
+    dataset = loader.MetaGratingDataLoader(n_samp_pts=1024)
     
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * 0.1) # 90-10 split
@@ -44,6 +43,7 @@ def train_model(model, epochs, batch_size, learning_rate, device):
         print("epoch " + str(epoch) + " started")
         for batch in train_loader:
 
+            
             optimizer.zero_grad(set_to_none=True)
 
             print("processing batch " + str(batchcount))

@@ -7,9 +7,52 @@ import torch
 import torch.nn.functional as F
 # from torchvision import transforms
 from unet import UNet
-from utils import plot_hr_lr_sr
 import jnet
 import dataloader
+
+
+import matplotlib.pyplot as plt
+
+def plot_hr_lr_sr(hr_data, lr_data, sr_data, int_data=None):
+    """
+    Plots the HR ground truth, LR image, and HR super-resolved (SR) image 
+    side-by-side for both the real and imaginary parts of the Hy field.
+    Want two columns (real and imaginary) and three rows (HR, LR, and SR).
+
+    Args:
+        lr_data: the LR array for single example; shape [3, 32, 128] np array
+        hr_data: the HR array for single example; shape [2, 64, 256] np array
+        Note: the 3 channels are permitivities and the Re and Im parts of the 
+        Hy field.
+    """
+    if int_data is None:
+        num_rows = 3
+    else:
+        num_rows = 4
+
+    fig, axs = plt.subplots(num_rows, 2, figsize=(10, 10))
+    fig.suptitle('HR, LR, and SR Hy field')
+    axs[0, 0].imshow(hr_data[0, :, :])
+    axs[0, 0].set_title('HR Re(Hy)')
+    axs[0, 1].imshow(hr_data[1, :, :])
+    axs[0, 1].set_title('HR Im(Hy)')
+    axs[1, 0].imshow(lr_data[0, :, :])
+    axs[1, 0].set_title('LR Re(Hy)')
+    axs[1, 1].imshow(lr_data[1, :, :])
+    axs[1, 1].set_title('LR Im(Hy)')
+    axs[2, 0].imshow(sr_data[0, :, :])
+    axs[2, 0].set_title('SR Re(Hy)')
+    axs[2, 1].imshow(sr_data[1, :, :])
+    axs[2, 1].set_title('SR Im(Hy)')
+    if int_data is not None:
+        axs[3, 0].imshow(int_data[0, :, :])
+        axs[3, 0].set_title('Int Re(Hy)')
+        axs[3, 1].imshow(int_data[1, :, :])
+        axs[3, 1].set_title('Int Im(Hy)')
+
+    plt.savefig('pred.png')
+    plt.show()
+
 
 # I will assume that the lr input image is a 3D array [3, 32, 128]
 # and the hr truth is a 3D array [2, 64, 256] (permitivities have been removed).
@@ -70,7 +113,7 @@ if __name__ == '__main__':
     # truth_files = args.truth
     # in_files = args.input
 
-    hr_eps, lr_fields, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0, )[int(args.exnum[0])]
+    hr_eps, lr_fields, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True)[int(args.exnum[0])]
 
     #out_files = get_output_filenames(args)
 
@@ -87,7 +130,7 @@ if __name__ == '__main__':
     #logging.info('Model loaded!')
 
     # must first open a data file and read it into a numpy array
-    sr_img = predict_img(net=net, lr_img=lr_fields, hr_eps=hr_eps, device=device)
+    sr_fields = predict_img(net=net, lr_img=lr_fields, hr_eps=hr_eps, device=device)
 
     if not args.no_save:
         pass
@@ -97,4 +140,4 @@ if __name__ == '__main__':
 
     if args.viz:
         #logging.info(f'Visualizing results for image {filename}, close to continue...')
-        plot_hr_lr_sr(hr_fields, lr_fields, sr_img)
+        plot_hr_lr_sr(hr_fields, lr_fields, sr_fields)

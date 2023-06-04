@@ -27,6 +27,8 @@ class MetaGratingDataLoader(Dataset):
 
         self.return_hres = return_hres
 
+        
+
     def __len__(self):
         return self.n_samples
 

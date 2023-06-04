@@ -10,14 +10,14 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 import dataloader as loader
-import jnet
+import cont_jnet
 
 #from torch.utils.tensorboard import SummaryWriter
 
 def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01, gamma=0.9):
     
     # 1. Open Dataset
-    dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy')
+    dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy', n_samp_pts=1024)
     
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * 0.1) # 90-10 split
@@ -53,10 +53,10 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
             optimizer.zero_grad(set_to_none=True)
             print("processing training batch " + str(train_batchcount))
             
-            hr_eps, lr_fields, hr_fields = batch
+            hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
 
-            pred_hr_fields = model(lr_fields, hr_eps)
-            train_loss = loss_fn(pred_hr_fields, hr_fields)
+            pred_pt_hr_fields = model(lr_fields, hr_eps, pt_coos)
+            train_loss = loss_fn(pred_pt_hr_fields, pt_vals)
 
             #train_writer.add_scalar("Loss", train_loss, epoch)
             print("training loss", train_loss.item())
@@ -83,11 +83,11 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
             for batch in val_loader:
                 print("processing val batch " + str(val_batchcount))
                 
-                hr_eps, lr_fields, hr_fields = batch
+                hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
 
-                pred_hr_fields = model(lr_fields, hr_eps)
+                pred_pt_hr_fields = model(lr_fields, hr_eps, pt_coos)
+                val_loss = loss_fn(pred_pt_hr_fields, pt_vals)
 
-                val_loss = loss_fn(pred_hr_fields, hr_fields) 
                 #val_writer.add_scalar("Loss", val_loss, epoch)
                 print("val loss", val_loss.item())
                 val_batch_loss.append(val_loss.item())
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     gamma = float(args.gamma[0])
 
     #Create Model
-    model = jnet.TCAJNet(upsampling_layers=int(np.log2(scale_factor)))
+    model = cont_jnet.ContJNet(upsampling_layers=int(np.log2(scale_factor)))
 
     # Create a SummaryWriter for logging
     suffix = f"jnet_run_name_{run_name}"
