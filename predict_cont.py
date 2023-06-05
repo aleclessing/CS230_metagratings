@@ -42,9 +42,11 @@ def predict_plot(lr_fields, hr_fields, pt_coos, pt_vals, sr_vals):
     
     axs[1].scatter(x=zs, y=xs, c=color_func(sr_vals[:,0]), s=100, edgecolors='black')
 
+    print("jevoiej", pt_vals.shape, sr_vals.shape)
+
     axs[0].scatter(pt_vals[:,0], sr_vals[:,0])
 
-    plt.savefig('latest_train_plot.png')
+    plt.show()
 
 
 def get_args():
@@ -67,13 +69,11 @@ if __name__ == '__main__':
 
     hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=20 )[int(args.exnum[0])]
 
-    net = cont_jnet.ContJNet(upsampling_layers=int(np.log2(scale_factor)))
+    net = torch.load(args.model)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    net.to(device=device)
-    state_dict = torch.load(args.model, map_location=device)
-    net.load_state_dict(state_dict)
+    
 
     # must first open a data file and read it into a numpy array
     sr_pt_fields = predict_fields(net, lr_fields, hr_eps, pt_coos)
@@ -85,4 +85,4 @@ if __name__ == '__main__':
     diagnose(pt_vals, pt_coos, sr_pt_fields)
 
     if args.viz:
-        pass#predict_plot(net, lr_fields, hr_fields, pt_coos, pt_vals, sr_pt_fields)
+        predict_plot(lr_fields, hr_fields, pt_coos, pt_vals.detach().numpy()[0], sr_pt_fields.detach().numpy()[0])

@@ -12,9 +12,7 @@ from tqdm import tqdm
 import dataloader as loader
 import jnet
 
-#from torch.utils.tensorboard import SummaryWriter
-
-def train_model(model, epochs, batch_size, learning_rate, device , train_writer, val_writer, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01, gamma=0.9):
+def train_model(model, epochs, batch_size, learning_rate, device , train_writer=None, val_writer=None, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01, gamma=0.9, num_cpus=None, prefetch_factor=1, save_every_batch=False):
     
     # 1. Open Dataset
     dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy')
@@ -26,15 +24,19 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
 
     # 3. Create data loaders
     loader_args = dict(batch_size=batch_size, pin_memory=False, multiprocessing_context="fork")
-    if device != 'cpu':
+
+    if num_cpus == None:
         loader_args['num_workers'] = os.cpu_count()
-        loader_args['prefetch_factor'] = 2
+    else:
+        loader_args['num_workers'] = num_cpus
+    
+    if prefetch_factor != None:
+        loader_args['prefetch_factor'] = prefetch_factor
 
     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
 
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
-    weight_decay: float = 1e-8
 
     optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
@@ -43,7 +45,6 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
     global_step = 0
 
     # 5. Begin training
-    train_loss_values = [] # For saving epoch loss
     for epoch in range(1, epochs + 1):
         model.train()
         train_batch_loss = []
@@ -70,10 +71,13 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
 
             train_batchcount+=1
 
+            if save_every_batch:
+                torch.save(model.state_dict(), model_name)
+
         scheduler.step()
         avg_train_loss = sum(train_batch_loss) / train_batchcount
-        train_loss_values.append(avg_train_loss)
-        #train_writer.add_scalar("Avg Loss", avg_train_loss, epoch)
+
+        torch.save(model.state_dict(), model_name)
 
         # Evaluate the model on the validation set
         model.eval() # sets the model to evaluation mode
@@ -88,9 +92,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
                 pred_hr_fields = model(lr_fields, hr_eps)
 
                 val_loss = loss_fn(pred_hr_fields, hr_fields) 
-                #val_writer.add_scalar("Loss", val_loss, epoch)
                 print("val loss", val_loss.item())
-                val_batch_loss.append(val_loss.item())
 
             avg_val_loss = sum(val_batch_loss) / val_batchcount
             #val_writer.add_scalar("Avg Loss", avg_val_loss, epoch)
@@ -99,8 +101,6 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer,
                 print('val ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' loss ' + str(val_loss.item()), file=txt_log, flush=True)
 
             val_batchcount+=1
-
-        torch.save(model.state_dict(), model_name)
 
 
 def get_args():
@@ -112,7 +112,10 @@ def get_args():
     parser.add_argument('--scaling_factor', '-s', metavar='SCALEFACTOR', nargs='+', help='Scaling factor (amount of upsampling to do)', required=True)
     parser.add_argument('--weight_decay', '-w', metavar='WEIGHTDECAY', nargs='+', help='Weight Decay', required=True)
     parser.add_argument('--gamma', '-g', metavar='GAMMA', nargs='+', help='Learning Rate Decay Rate', required=True)
-    
+    parser.add_argument('--continue_training', '-c', action='store_true', help='Continue Training Model', default=False)
+    parser.add_argument('--save_every_batch', '-eb', action='store_true', help='Save the model at every batch of training (useful for work tweaking the training script)', default=False)
+    parser.add_argument('--num_cpus', '-cpu', metavar='CPUNUM', nargs='+', help='Number of CPUs to use', required=False)
+
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -129,15 +132,15 @@ if __name__ == '__main__':
     scale_factor = int(args.scaling_factor[0])
     weight_decay = float(args.weight_decay[0])
     gamma = float(args.gamma[0])
+    if args.num_cpus != None:
+        num_cpus = int(args.num_cpus[0])
+    else:
+        num_cpus = None
 
     #Create Model
     model = jnet.TCAJNet(upsampling_layers=int(np.log2(scale_factor)))
-
-    # Create a SummaryWriter for logging
-    suffix = f"jnet_run_name_{run_name}"
-    train_writer = None#SummaryWriter(log_dir="logs/train_logs", filename_suffix=suffix)
-    val_writer = None#SummaryWriter(log_dir="logs/val_logs", filename_suffix=suffix)
     
+    #Initialize Log
     lf = open('logs/txt_logs/'+str(run_name)+'_log.txt', 'w+')
 
     model_name = 'models/model_' + run_name + '.pth'
@@ -148,20 +151,11 @@ if __name__ == '__main__':
             batch_size=batch_size,
             learning_rate=learning_rate,
             device=device,
-            train_writer=train_writer,
-            val_writer=val_writer,
             model_name=model_name,
             txt_log=lf,
-            scale_factor=scale_factor)
-   
-    #train_writer.flush()
-    #val_writer.flush()
+            scale_factor=scale_factor,
+            save_every_batch=args.save_every_batch,
+            num_cpus=num_cpus)
     
     torch.save(model.state_dict(), model_name)
 
-    # Close the SummaryWriter
-    #train_writer.close()
-    #val_writer.close()
-
-# To see the tensorboard logs, run the following command in the terminal:
-# tensorboard --logdir=logs
