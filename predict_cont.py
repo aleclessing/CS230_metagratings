@@ -38,7 +38,6 @@ def predict_plot(lr_fields, hr_fields, pt_coos, pt_vals, sr_vals):
 
     xs = ((1+pt_coos[:, 0])/2)*hr_fields[0].shape[0]
     zs = ((1+pt_coos[:, 1])/2)*hr_fields[0].shape[1]
-
     
     axs[1].scatter(x=zs, y=xs, c=color_func(sr_vals[:,0]), s=100, edgecolors='black')
 
@@ -73,7 +72,6 @@ if __name__ == '__main__':
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    
 
     # must first open a data file and read it into a numpy array
     sr_pt_fields = predict_fields(net, lr_fields, hr_eps, pt_coos)

@@ -28,7 +28,7 @@ class ContDecoder(nn.Module):
 
 
     def forward(self, lr_fields, context_grid, hr_eps, coord):
-    
+
         extra_dim_coord = torch.unsqueeze(coord, 1)
 
         #necessary to ensure that coord ordering of x and z lines up with grid dimensions
@@ -40,6 +40,7 @@ class ContDecoder(nn.Module):
         lr_field_pts = F.grid_sample(lr_fields, extra_dim_coord, align_corners=False)
         hr_eps_pts = F.grid_sample(hr_eps, extra_dim_coord, align_corners=False)
 
+
         #reshape to feed into MLP layers
         context_pts = torch.squeeze(context_pts, dim=2)
         lr_field_pts = torch.squeeze(lr_field_pts, dim=2)
@@ -48,11 +49,16 @@ class ContDecoder(nn.Module):
         lr_field_pts = torch.permute(lr_field_pts, (0, 2, 1))
         hr_eps_pts = torch.permute(hr_eps_pts, (0, 2, 1))
 
+
         input = torch.cat([context_pts, coord, lr_field_pts, hr_eps_pts], dim=2)
+
+        print(input.shape)
 
         x = self.layers[0](input)
         x = F.relu(x)
         for i in range(1, len(self.layers)-1):
+
+            print('here' + str(10+i))
 
             x = torch.cat([x, input], dim=2)
             x = self.layers[i](x)

@@ -104,8 +104,6 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
         if not save_every_batch:
             torch.save(model, model_name) 
 
-
-
 def get_args():
     parser = argparse.ArgumentParser(description='Running training on the Block JNet')
     parser.add_argument('--run_name', '-r', metavar='RUNNAME', nargs='+', help='Run Name', required=True)
@@ -165,5 +163,3 @@ if __name__ == '__main__':
             scale_factor=scale_factor,
             save_every_batch=args.save_every_batch,
             num_cpus=num_cpus)
-    
-    torch.save(model.state_dict(), model_name)

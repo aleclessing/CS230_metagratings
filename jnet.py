@@ -52,11 +52,11 @@ class TCAJNet(nn.Module):
             x = torch.cat([x, upscaled_lr_fields_orig, eps_encodings[self.upsampling_layers - i]], dim=1)
 
             x = self.upsamp_convs[i](x)
+            #TODO: should be relu here, but adding it will mess up old model saves
             x = self.upsamp_resblocks[i](x)
 
         upscaled_lr_fields_orig = torch.nn.Upsample(scale_factor=2**self.upsampling_layers, mode='bilinear')(lr_fields)
 
-        #print(x.shape, upscaled_lr_fields_orig.shape, eps_encodings[0].shape)
         x = torch.cat([x, upscaled_lr_fields_orig, eps_encodings[0]], dim=1)
 
         x = self.semifinal_layer(x)

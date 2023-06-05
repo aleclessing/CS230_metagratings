@@ -10,13 +10,42 @@ from torch.utils.data import DataLoader, random_split
 from tqdm import tqdm
 
 import dataloader as loader
-import jnet
+import cont_jnet
+from predict_cont import predict_plot
+
+import pde_loss
+
+def gen_coord_grid(shape):
+    x_grid_pts = 2*(np.arange(shape[0]) + 0.5)/shape[0]-1
+    z_grid_pts = 2*(np.arange(shape[1]) + 0.5)/shape[1]-1
+
+    xs, zs = np.meshgrid(x_grid_pts, z_grid_pts)
+
+    coord_grid = np.stack(xs, zs, axis=2)
+
+    return torch.tensor(coord_grid)
+
+def gen_grid_pt_coords(shape):
+    x_grid_pts = 2*(np.arange(shape[0]) + 0.5)/shape[0]-1
+    z_grid_pts = 2*(np.arange(shape[1]) + 0.5)/shape[1]-1
+
+    xs, zs = np.meshgrid(x_grid_pts, z_grid_pts)
+
+    print(zs.shape)
+    grid_pt_coos = np.stack([xs, zs], axis=2)
+
+    grid_pt_coos = torch.tensor(grid_pt_coos)
+    grid_pt_coos = torch.reshape(grid_pt_coos, (shape[0]*shape[1], 2))
+
+    return grid_pt_coos.float()
+
+    
 
 
-def train_model(model, epochs, batch_size, learning_rate, device , train_writer=None, val_writer=None, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01, gamma=0.9, save_every_batch=False, prefetch_factor=1, num_cpus=None, loss_type="mse"):
+def train_model(model, epochs, batch_size, learning_rate, device , train_writer=None, val_writer=None, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01, gamma=0.9, save_every_batch=False, prefetch_factor=1, num_cpus=None):
     
     # 1. Open Dataset
-    dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy', n_samp_pts=0)
+    dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy')
     
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * 0.1) # 90-10 split
@@ -24,15 +53,12 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
     train_set, val_set = random_split(dataset, [n_train, n_val], generator=torch.Generator().manual_seed(0))
 
     # 3. Create data loaders
-    loader_args = dict(batch_size=batch_size, pin_memory=False)
+    loader_args = dict(batch_size=batch_size, pin_memory=False, multiprocessing_context="fork")
 
     if num_cpus == None:
         loader_args['num_workers'] = os.cpu_count()
     else:
         loader_args['num_workers'] = num_cpus
-
-    if num_cpus != 0:
-        loader_args['multiprocessing_context'] = 'fork'
     
     if prefetch_factor != None:
         loader_args['prefetch_factor'] = prefetch_factor
@@ -43,15 +69,11 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
-
-    if loss_type == "mse":
-        loss_fn = nn.MSELoss()
-    else:
-        import pde_loss
-        loss_fn = pde_loss.CustomLoss()
-
+    loss_fn = pde_loss.CustomLoss()
 
     global_step = 0
+
+    grid_pt_coos = gen_grid_pt_coords((64, 256))
 
     # 5. Begin training
     for epoch in range(1, epochs + 1):
@@ -65,11 +87,13 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
             
             hr_eps, lr_fields, hr_fields = batch
 
-            pred_hr_fields = model(lr_fields, hr_eps)
-            if loss_type == "pde":
-                train_loss = loss_fn(pred_hr_fields, hr_fields, hr_eps)
-            else:
-                train_loss = loss_fn(pred_hr_fields, hr_fields)
+            grid_pt_coo_batch = grid_pt_coos.unsqueeze(0)
+            grid_pt_coo_batch = grid_pt_coo_batch.expand(batch_size, 256*64, 2)
+            print(grid_pt_coo_batch.shape)
+            sr_grid_fields = model(lr_fields, hr_eps, grid_pt_coo_batch)
+            print(sr_grid_fields.shape)
+            sr_grid_fields = torch.reshape(sr_grid_fields, (batch_size, 64, 256, 2))
+            train_loss = loss_fn(sr_grid_fields, hr_fields, hr_eps)
 
             print("training loss", train_loss.item())
             train_loss.backward()
@@ -83,7 +107,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
 
             train_batchcount+=1
             if save_every_batch:
-                torch.save(model.state_dict(), model_name) 
+                torch.save(model, model_name) 
 
         scheduler.step()
         avg_train_loss = sum(train_batch_loss) / train_batchcount
@@ -96,12 +120,10 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
             for batch in val_loader:
                 print("processing val batch " + str(val_batchcount))
                 
-                hr_eps, lr_fields, hr_fields = batch
+                hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
 
-                if loss_type == "pde":
-                    val_loss = loss_fn(pred_hr_fields, hr_fields, hr_eps)
-                else:
-                    val_loss = loss_fn(pred_hr_fields, hr_fields)
+                sr_pt_fields = model(lr_fields, hr_eps, pt_coos)
+                val_loss = loss_fn(sr_pt_fields, pt_vals)
 
                 print("val loss", val_loss.item())
                 val_batch_loss.append(val_loss.item())
@@ -114,9 +136,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
             val_batchcount+=1
 
         if not save_every_batch:
-            torch.save(model.state_dict(), model_name)
-
-
+            torch.save(model, model_name) 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Running training on the Block JNet')
@@ -127,10 +147,11 @@ def get_args():
     parser.add_argument('--scaling_factor', '-s', metavar='SCALEFACTOR', nargs='+', help='Scaling factor (amount of upsampling to do)', required=True)
     parser.add_argument('--weight_decay', '-w', metavar='WEIGHTDECAY', nargs='+', help='Weight Decay', required=True)
     parser.add_argument('--gamma', '-g', metavar='GAMMA', nargs='+', help='Learning Rate Decay Rate', required=True)
+    parser.add_argument('--continue_training', '-c', action='store_true', help='Continue Training Model', default=False)
     parser.add_argument('--save_every_batch', '-eb', action='store_true', help='Save the model at every batch of training (useful for work tweaking the training script)', default=False)
     parser.add_argument('--num_cpus', '-cpu', metavar='CPUNUM', nargs='+', help='Number of CPUs to use', required=False)
-    parser.add_argument('--pde_loss', '-pde', action='store_true', help='Use PDE Loss Fn', default=False)
 
+    
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -147,28 +168,23 @@ if __name__ == '__main__':
     scale_factor = int(args.scaling_factor[0])
     weight_decay = float(args.weight_decay[0])
     gamma = float(args.gamma[0])
-    if args.pde_loss:
-        loss_type = "pde"
-    else:
-        loss_type = "mse"
-
+    cont = args.continue_training
     if args.num_cpus != None:
         num_cpus = int(args.num_cpus[0])
     else:
         num_cpus = None
-
-    if num_cpus == 0:
-        prefectch_factor = None
-    else:
-        prefectch_factor = 2
 
     #Create Log File
     lf = open('logs/txt_logs/'+str(run_name)+'_log.txt', 'w+')
 
     model_name = 'models/model_' + run_name + '.pth'
     #Creat Model
-    print("initializing new model")
-    model = jnet.TCAJNet(upsampling_layers=int(np.log2(scale_factor)))
+    if cont:
+        print("continuing model training based on run name")
+        model = torch.load(model_name)
+    else:
+        print("initializing new model")
+        model = cont_jnet.ContJNet(upsampling_layers=int(np.log2(scale_factor)))
     
     train_model(
             model=model,
@@ -180,6 +196,4 @@ if __name__ == '__main__':
             txt_log=lf,
             scale_factor=scale_factor,
             save_every_batch=args.save_every_batch,
-            num_cpus=num_cpus,
-            loss_type=loss_type,
-            prefetch_factor=prefectch_factor)
+            num_cpus=num_cpus)
