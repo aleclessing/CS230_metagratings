@@ -39,8 +39,6 @@ def gen_grid_pt_coords(shape):
 
     return grid_pt_coos.float()
 
-    
-
 
 def train_model(model, epochs, batch_size, learning_rate, device , train_writer=None, val_writer=None, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01, gamma=0.9, save_every_batch=False, prefetch_factor=1, num_cpus=None):
     
@@ -90,9 +88,13 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
             grid_pt_coo_batch = grid_pt_coos.unsqueeze(0)
             grid_pt_coo_batch = grid_pt_coo_batch.expand(batch_size, 256*64, 2)
             print(grid_pt_coo_batch.shape)
+
+            #TODO: randomly sample pts to get mse loss and then grid sample for PDE loss
+
             sr_grid_fields = model(lr_fields, hr_eps, grid_pt_coo_batch)
             print(sr_grid_fields.shape)
-            sr_grid_fields = torch.reshape(sr_grid_fields, (batch_size, 64, 256, 2))
+            sr_grid_fields = torch.reshape(sr_grid_fields, (batch_size, 2, 64, 256))
+            print("loop", sr_grid_fields.shape)
             train_loss = loss_fn(sr_grid_fields, hr_fields, hr_eps)
 
             print("training loss", train_loss.item())

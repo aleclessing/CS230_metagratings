@@ -66,6 +66,8 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
             hr_eps, lr_fields, hr_fields = batch
 
             pred_hr_fields = model(lr_fields, hr_eps)
+
+            print(pred_hr_fields.shape)
             if loss_type == "pde":
                 train_loss = loss_fn(pred_hr_fields, hr_fields, hr_eps)
             else:
@@ -97,6 +99,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
                 print("processing val batch " + str(val_batchcount))
                 
                 hr_eps, lr_fields, hr_fields = batch
+
 
                 if loss_type == "pde":
                     val_loss = loss_fn(pred_hr_fields, hr_fields, hr_eps)

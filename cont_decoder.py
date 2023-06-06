@@ -40,7 +40,6 @@ class ContDecoder(nn.Module):
         lr_field_pts = F.grid_sample(lr_fields, extra_dim_coord, align_corners=False)
         hr_eps_pts = F.grid_sample(hr_eps, extra_dim_coord, align_corners=False)
 
-
         #reshape to feed into MLP layers
         context_pts = torch.squeeze(context_pts, dim=2)
         lr_field_pts = torch.squeeze(lr_field_pts, dim=2)
