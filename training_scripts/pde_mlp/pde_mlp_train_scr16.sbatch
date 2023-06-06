@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 4
-#SBATCH --time=10:00:00
+#SBATCH --time=16:00:00
 #SBATCH --job-name=pde_mlp_run16
 #SBATCH --output=outputs/pde_mlp_run16_out.out
 #SBATCH --mem=64G

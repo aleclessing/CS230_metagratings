@@ -79,13 +79,18 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
     for epoch in range(1, epochs + 1):
         model.train()
         train_batch_loss = []
-        train_batchcount = 1
+        train_batchcount = 0
         print("epoch " + str(epoch) + " started")
         for batch in train_loader:
+            train_batchcount+=1
+            #if not (train_batchcount < 2 or train_batchcount > 105):
+                #continue
             optimizer.zero_grad(set_to_none=True)
             print("processing training batch " + str(train_batchcount))
             
             hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
+            examples_in_this_batch = hr_eps.shape[0]
+            print(examples_in_this_batch)
 
             #MSE Loss from randomly sampled points
             sr_pt_fields = model(lr_fields, hr_eps, pt_coos)
@@ -96,12 +101,12 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
 
             #PDE Loss From Grid
             grid_pt_coo_batch = grid_pt_coos.unsqueeze(0)
-            grid_pt_coo_batch = grid_pt_coo_batch.expand(batch_size, 256*64, 2)
+            grid_pt_coo_batch = grid_pt_coo_batch.expand(examples_in_this_batch, 256*64, 2)
             print(grid_pt_coo_batch.shape)
 
             sr_grid_fields = model(lr_fields, hr_eps, grid_pt_coo_batch)
-            print(sr_grid_fields.shape)
-            sr_grid_fields = torch.reshape(sr_grid_fields, (batch_size, 2, 64, 256))
+
+            sr_grid_fields = torch.reshape(sr_grid_fields, (examples_in_this_batch, 2, 64, 256))
             train_loss += 10*pde_loss_fn(sr_grid_fields, hr_fields, hr_eps)
 
             print("total training loss", train_loss.item())
@@ -113,7 +118,6 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
                 print('train ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' mse loss ' + str(mse_loss_val) + " total loss "+ str(train_loss.item()), file=txt_log, flush=True)
                 #predict_plot(lr_fields[0].detach().numpy(), hr_fields[0].detach().numpy(), pt_coos[0].detach().numpy(), pt_vals[0].detach().numpy(), sr_pt_fields[0].detach().numpy())
 
-            train_batchcount+=1
             if save_every_batch:
                 torch.save(model, model_name) 
 
@@ -123,11 +127,15 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
         model.eval() # sets the model to evaluation mode
         with torch.no_grad():
             val_batch_loss = []
-            val_batchcount = 1
+            val_batchcount = 0
             for batch in val_loader:
+                val_batchcount+=1
+                #if val_batchcount < 7:
+                    #continue
                 print("processing val batch " + str(val_batchcount))
                 
                 hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
+                examples_in_this_batch = hr_eps.shape[0]
 
                 #MSE Loss from randomly sampled points
                 sr_pt_fields = model(lr_fields, hr_eps, pt_coos)
@@ -138,12 +146,12 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
 
                 #PDE Loss From Grid
                 grid_pt_coo_batch = grid_pt_coos.unsqueeze(0)
-                grid_pt_coo_batch = grid_pt_coo_batch.expand(batch_size, 256*64, 2)
+                grid_pt_coo_batch = grid_pt_coo_batch.expand(examples_in_this_batch, 256*64, 2)
                 print(grid_pt_coo_batch.shape)
 
                 sr_grid_fields = model(lr_fields, hr_eps, grid_pt_coo_batch)
                 print(sr_grid_fields.shape)
-                sr_grid_fields = torch.reshape(sr_grid_fields, (batch_size, 2, 64, 256))
+                sr_grid_fields = torch.reshape(sr_grid_fields, (examples_in_this_batch, 2, 64, 256))
                 val_loss += 10*pde_loss_fn(sr_grid_fields, hr_fields, hr_eps)
 
                 print("total val loss", val_loss.item())
@@ -155,7 +163,7 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
                 if txt_log != None:
                     print('val ep ' + str(epoch) + ' batch ' + str(val_batchcount) + ' mse loss ' + str(mse_loss_val) + " total loss "+ str(val_loss.item()), file=txt_log, flush=True)
 
-                val_batchcount+=1
+                
 
         if not save_every_batch:
             torch.save(model, model_name) 
