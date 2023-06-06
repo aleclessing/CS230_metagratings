@@ -43,7 +43,7 @@ def gen_grid_pt_coords(shape):
 def train_model(model, epochs, batch_size, learning_rate, device , train_writer=None, val_writer=None, model_name='model.pth', txt_log=None, scale_factor=2, weight_decay=0.01, gamma=0.9, save_every_batch=False, prefetch_factor=1, num_cpus=None):
     
     # 1. Open Dataset
-    dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy')
+    dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy', n_samp_pts=8000)
     
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * 0.1) # 90-10 split
@@ -67,7 +67,9 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
     # 4. Set up the optimizer, the loss, the learning rate scheduler and the loss scaling for AMP
     optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
-    loss_fn = pde_loss.CustomLoss()
+
+    mse_loss_fn = nn.MSELoss()
+    pde_loss_fn = pde_loss.CustomLoss()
 
     global_step = 0
 
@@ -83,28 +85,32 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
             optimizer.zero_grad(set_to_none=True)
             print("processing training batch " + str(train_batchcount))
             
-            hr_eps, lr_fields, hr_fields = batch
+            hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
 
+            #MSE Loss from randomly sampled points
+            sr_pt_fields = model(lr_fields, hr_eps, pt_coos)
+            train_loss = mse_loss_fn(sr_pt_fields, pt_vals)
+
+            mse_loss_val = train_loss.item()
+            print("mse loss", train_loss.item())
+
+            #PDE Loss From Grid
             grid_pt_coo_batch = grid_pt_coos.unsqueeze(0)
             grid_pt_coo_batch = grid_pt_coo_batch.expand(batch_size, 256*64, 2)
             print(grid_pt_coo_batch.shape)
 
-            #TODO: randomly sample pts to get mse loss and then grid sample for PDE loss
-
             sr_grid_fields = model(lr_fields, hr_eps, grid_pt_coo_batch)
             print(sr_grid_fields.shape)
             sr_grid_fields = torch.reshape(sr_grid_fields, (batch_size, 2, 64, 256))
-            print("loop", sr_grid_fields.shape)
-            train_loss = loss_fn(sr_grid_fields, hr_fields, hr_eps)
+            train_loss += 10*pde_loss_fn(sr_grid_fields, hr_fields, hr_eps)
 
-            print("training loss", train_loss.item())
+            print("total training loss", train_loss.item())
             train_loss.backward()
 
             optimizer.step()
 
-            train_batch_loss.append(train_loss.item())
             if txt_log != None:
-                print('train ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' loss ' + str(train_loss.item()), file=txt_log, flush=True)
+                print('train ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' mse loss ' + str(mse_loss_val) + " total loss "+ str(train_loss.item()), file=txt_log, flush=True)
                 #predict_plot(lr_fields[0].detach().numpy(), hr_fields[0].detach().numpy(), pt_coos[0].detach().numpy(), pt_vals[0].detach().numpy(), sr_pt_fields[0].detach().numpy())
 
             train_batchcount+=1
@@ -112,7 +118,6 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
                 torch.save(model, model_name) 
 
         scheduler.step()
-        avg_train_loss = sum(train_batch_loss) / train_batchcount
 
         # Evaluate the model on the validation set
         model.eval() # sets the model to evaluation mode
@@ -124,18 +129,33 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
                 
                 hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = batch
 
+                #MSE Loss from randomly sampled points
                 sr_pt_fields = model(lr_fields, hr_eps, pt_coos)
-                val_loss = loss_fn(sr_pt_fields, pt_vals)
+                val_loss = mse_loss_fn(sr_pt_fields, pt_vals)
 
-                print("val loss", val_loss.item())
+                mse_loss_val = val_loss.item()
+                print("val mse loss", val_loss.item())
+
+                #PDE Loss From Grid
+                grid_pt_coo_batch = grid_pt_coos.unsqueeze(0)
+                grid_pt_coo_batch = grid_pt_coo_batch.expand(batch_size, 256*64, 2)
+                print(grid_pt_coo_batch.shape)
+
+                sr_grid_fields = model(lr_fields, hr_eps, grid_pt_coo_batch)
+                print(sr_grid_fields.shape)
+                sr_grid_fields = torch.reshape(sr_grid_fields, (batch_size, 2, 64, 256))
+                val_loss += 10*pde_loss_fn(sr_grid_fields, hr_fields, hr_eps)
+
+                print("total val loss", val_loss.item())
+
                 val_batch_loss.append(val_loss.item())
+                if txt_log != None:
+                    print('val ep ' + str(epoch) + ' batch ' + str(val_batchcount) + ' loss ' + str(val_loss.item()), file=txt_log, flush=True)
 
-            avg_val_loss = sum(val_batch_loss) / val_batchcount
+                if txt_log != None:
+                    print('val ep ' + str(epoch) + ' batch ' + str(val_batchcount) + ' mse loss ' + str(mse_loss_val) + " total loss "+ str(val_loss.item()), file=txt_log, flush=True)
 
-            if txt_log != None:
-                print('val ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' loss ' + str(val_loss.item()), file=txt_log, flush=True)
-
-            val_batchcount+=1
+                val_batchcount+=1
 
         if not save_every_batch:
             torch.save(model, model_name) 

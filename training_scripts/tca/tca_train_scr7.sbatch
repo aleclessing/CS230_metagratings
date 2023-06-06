@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -c 4
-#SBATCH --time=8:00:00
+#SBATCH --time=10:00:00
 #SBATCH --job-name=tca_run7
 #SBATCH --output=outputs/tca_run7_out.out
 #SBATCH --mem=32G

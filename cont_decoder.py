@@ -51,13 +51,10 @@ class ContDecoder(nn.Module):
 
         input = torch.cat([context_pts, coord, lr_field_pts, hr_eps_pts], dim=2)
 
-        print(input.shape)
 
         x = self.layers[0](input)
         x = F.relu(x)
         for i in range(1, len(self.layers)-1):
-
-            print('here' + str(10+i))
 
             x = torch.cat([x, input], dim=2)
             x = self.layers[i](x)

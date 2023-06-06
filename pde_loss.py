@@ -4,6 +4,24 @@ import torch.nn.functional as F
 import numpy as np
 
 
+def d2_dx2(grid, h):
+    d2_dx2 = torch.zeros_like(grid)
+    d2_dx2[:, 1:-1] = (grid[:, 2:] - 2 * grid[:, 1:-1] + grid[:, :-2]) / (h**2)
+    return d2_dx2
+
+def d2_dydx(grid, h):
+    d2_dydx = torch.zeros_like(grid)
+    d2_dydx[1:-1, 1:-1] = (grid[2:, 2:] - grid[2:, :-2] - grid[:-2, 2:] + grid[:-2, :-2]) / (4 * h**2)
+        
+def pde_loss(pred, eps, dx):
+    mu0 = 1.26663706 * 1e-6 # m kg s-2 A-2
+    omega = 2 * np.pi * 2.99792658e8 / ( 1050e-9 * torch.sqrt(eps) ) 
+    eps0 = 8.854187817e-12 # F / m
+    d2Hy_dx2 = d2_dx2(pred, dx)
+    pde_loss = omega[:, :, 2:-2]**2 * mu0 * pred[:, :, 2:-2] + d2Hy_dx2[:, :, 2:-2] / ( eps[:, :, 2:-2] * eps0 )
+    return pde_loss
+        
+        
 class CustomLoss(nn.Module):
     def __init__(self):
         super(CustomLoss, self).__init__()
@@ -16,54 +34,39 @@ class CustomLoss(nn.Module):
         alpha = 0.1
         dx = 1600e-9 / pred_hr_fields.shape[3]
         
-        mu0 = 1.25663706 * 1e-6 # m kg s-2 A-2
-        omega = 2 * np.pi * 2.99792458e8 / ( 1050e-9 ) 
-        eps0 = 8.854187817e-12 # F / m
+        # mu0 = 1.26663706 * 1e-6 # m kg s-2 A-2
+        # omega = 2 * np.pi * 2.99792658e8 / ( 1050e-9 * torch.sqrt(hr_eps) ) 
+        # eps0 = 8.854187817e-12 # F / m
         
         real_pred = pred_hr_fields[:, 0, :, :]
         imag_pred = pred_hr_fields[:, 1, :, :]
         real_target = hr_fields[:, 0, :, :]
         imag_target = hr_fields[:, 1, :, :]
-        
-        # MSE Loss
-        
-        real_mse_loss = torch.mean(torch.abs(real_pred - real_target))
-        imag_mse_loss = torch.mean(torch.abs(imag_pred - imag_target))
-        
-        total_mse_loss = real_mse_loss + imag_mse_loss
                 
         # PDE loss
-        # For NN evaluation of d2Hy_dx2, must first pad input
-        # When evaluating PDE loss, do not consider the border in the sum
-                
-        real_pred_padded = F.pad(real_pred, pad=(1, 1), mode='constant', value=0)
-        imag_pred_padded = F.pad(imag_pred, pad=(1, 1), mode='constant', value=0) # double check
-        
-        real_d2Hy_dx2 = ( real_pred_padded[:, :, 1:-3] - real_pred_padded[:, :, 3:-1] ) / 2
-        real_d2Hy_dx2 /= dx**2
-        imag_d2Hy_dx2 = ( imag_pred_padded[:, :, 1:-3] - imag_pred_padded[:, :, 3:-1] ) / 2
-        imag_d2Hy_dx2 /= dx**2
-        
-        # print(f"real_pred shape: {real_pred.shape}")
-        # print(f"real_pred_padded shape: {real_pred_padded.shape}")
-        # print(f"real_d2Hy_dx2 shape: {real_d2Hy_dx2.shape}")
-        # print(f"real_pred[:, :, 1:-1] shape: {real_pred[:, :, 1:-1].shape}")
-        # print(f"hr_eps[:, :, 1:-1] shape: {hr_eps[:, :, 1:-1].shape}")
-        # print(f"real_d2Hy_dx2 shape: {real_d2Hy_dx2.shape}")
-        
-        real_pde_loss = omega**2 * mu0 * real_pred[:, :, 1:-1] - real_d2Hy_dx2 / ( hr_eps[:, :, 1:-1] * eps0 )
-        imag_pde_loss = omega**2 * mu0 * imag_pred[:, :, 1:-1] - imag_d2Hy_dx2 / ( hr_eps[:, :, 1:-1] * eps0 )
+        real_pde_loss = pde_loss(real_pred, hr_eps, dx)
+        imag_pde_loss = pde_loss(imag_pred, hr_eps, dx)
 
-        # Take MAE and multiply by 1e-24 to counterbalance large prefactors (i.e. normalize)
-        real_pde_loss = torch.mean(torch.abs(real_pde_loss)) * 1e-24
-        imag_pde_loss = torch.mean(torch.abs(imag_pde_loss)) * 1e-42
+        # Take MAE and multiply by 1e-26 to counterbalance large prefactors (i.e. normalize)
+        real_pde_loss = torch.mean(torch.abs(real_pde_loss)) * 1e-26
+        imag_pde_loss = torch.mean(torch.abs(imag_pde_loss)) * 1e-26
         total_pde_loss = real_pde_loss + imag_pde_loss
-        
-        # Combine MSE and PDE MAE
 
-        total_loss = total_mse_loss + alpha * total_pde_loss
-        print(f"total_mse_loss: {total_mse_loss}")
+        #Scale PDE Loss
+        total_loss = alpha * total_pde_loss
         print(f"total_pde_loss: {total_pde_loss}")
-        print(f"total_loss: {total_loss}")
+        
+        # Validate that PDE loss is reasonable for the ground truth
+        # Idea: normalize PDE loss by the results for the ground truth     
+        real_target_pde_loss = pde_loss(real_target, hr_eps, dx)
+        imag_target_pde_loss = pde_loss(imag_target, hr_eps, dx)
+        
+        real_target_pde_loss = torch.mean(torch.abs(real_target_pde_loss)) * 1e-26
+        imag_target_pde_loss = torch.mean(torch.abs(imag_target_pde_loss)) * 1e-26
+        
+        total_target_pde_loss = real_target_pde_loss + imag_target_pde_loss
+        print(f"total_target_pde_loss: {total_target_pde_loss}")
+        print(f"pde loss ration (pred/target): {total_pde_loss/total_target_pde_loss}")
         
         return total_loss
+

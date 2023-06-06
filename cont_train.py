@@ -117,7 +117,6 @@ def get_args():
     parser.add_argument('--save_every_batch', '-eb', action='store_true', help='Save the model at every batch of training (useful for work tweaking the training script)', default=False)
     parser.add_argument('--num_cpus', '-cpu', metavar='CPUNUM', nargs='+', help='Number of CPUs to use', required=False)
 
-    
     return parser.parse_args()
 
 if __name__ == '__main__':
@@ -144,7 +143,7 @@ if __name__ == '__main__':
     lf = open('logs/txt_logs/'+str(run_name)+'_log.txt', 'w+')
 
     model_name = 'models/model_' + run_name + '.pth'
-    #Creat Model
+    #Create Model
     if cont:
         print("continuing model training based on run name")
         model = torch.load(model_name)

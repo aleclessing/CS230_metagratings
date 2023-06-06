@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
     scale_factor = 8
 
-    hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=20 )[int(args.exnum[0])]
+    hr_eps, lr_fields, pt_coos, pt_vals, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True, n_samp_pts=20, lr_data_filename='' )[int(args.exnum[0])]
 
     net = torch.load(args.model)
 

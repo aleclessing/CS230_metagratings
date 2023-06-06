@@ -123,11 +123,7 @@ if __name__ == '__main__':
     #logging.info(f'Loading model {args.model}')
     #logging.info(f'Using device {device}')
 
-    net.to(device=device)
-    state_dict = torch.load(args.model, map_location=device)
-    net.load_state_dict(state_dict)
-
-    #logging.info('Model loaded!')
+    net = torch.load(args.model)
 
     # must first open a data file and read it into a numpy array
     sr_fields = predict_img(net=net, lr_img=lr_fields, hr_eps=hr_eps, device=device)

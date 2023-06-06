@@ -17,7 +17,8 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
     
     # 1. Open Dataset
     dataset = loader.MetaGratingDataLoader(return_hres=True, lr_data_filename= 'data/metanet_lr_data_downsamp' + str(scale_factor) + '.npy', n_samp_pts=0)
-    
+    dataset.__len__ = 2000
+
     # 2. Split into train / validation partitions
     n_val = int(len(dataset) * 0.1) # 90-10 split
     n_train = len(dataset) - n_val
@@ -44,11 +45,11 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
     optimizer = optim.AdamW(params = model.parameters(), lr=learning_rate, eps=1e-9, weight_decay=weight_decay)
     scheduler = optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma)
 
-    if loss_type == "mse":
-        loss_fn = nn.MSELoss()
-    else:
+    mse_loss_fn = nn.MSELoss()
+
+    if loss_type == "pde":
         import pde_loss
-        loss_fn = pde_loss.CustomLoss()
+        pde_loss_fn = pde_loss.CustomLoss()
 
 
     global_step = 0
@@ -67,25 +68,27 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
 
             pred_hr_fields = model(lr_fields, hr_eps)
 
-            print(pred_hr_fields.shape)
-            if loss_type == "pde":
-                train_loss = loss_fn(pred_hr_fields, hr_fields, hr_eps)
-            else:
-                train_loss = loss_fn(pred_hr_fields, hr_fields)
+            train_loss = mse_loss_fn(pred_hr_fields, hr_fields)
+            mse_loss_val = train_loss.item()
 
-            print("training loss", train_loss.item())
+            print("mse training loss", train_loss.item())
+            if loss_type == "pde":
+                train_loss += pde_loss_fn(pred_hr_fields, hr_fields, hr_eps)
+
+            print("total training loss", train_loss.item())
+
             train_loss.backward()
 
             optimizer.step()
 
             train_batch_loss.append(train_loss.item())
             if txt_log != None:
-                print('train ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' loss ' + str(train_loss.item()), file=txt_log, flush=True)
+                print('train ep ' + str(epoch) + ' batch ' + str(train_batchcount) + 'mse loss ' + str(mse_loss_val) + ' total loss ' + str(train_loss.item()), file=txt_log, flush=True)
                 #predict_plot(lr_fields[0].detach().numpy(), hr_fields[0].detach().numpy(), pt_coos[0].detach().numpy(), pt_vals[0].detach().numpy(), sr_pt_fields[0].detach().numpy())
 
             train_batchcount+=1
             if save_every_batch:
-                torch.save(model.state_dict(), model_name) 
+                torch.save(model, model_name)  
 
         scheduler.step()
         avg_train_loss = sum(train_batch_loss) / train_batchcount
@@ -100,26 +103,26 @@ def train_model(model, epochs, batch_size, learning_rate, device , train_writer=
                 
                 hr_eps, lr_fields, hr_fields = batch
 
+                pred_hr_fields = model(lr_fields, hr_eps)
+                
+                val_loss = mse_loss_fn(pred_hr_fields, hr_fields)
+                mse_loss_val = val_loss.item()
 
+                print("mse val loss", val_loss.item())
                 if loss_type == "pde":
-                    val_loss = loss_fn(pred_hr_fields, hr_fields, hr_eps)
-                else:
-                    val_loss = loss_fn(pred_hr_fields, hr_fields)
+                    val_loss += pde_loss_fn(pred_hr_fields, hr_fields, hr_eps)
 
-                print("val loss", val_loss.item())
-                val_batch_loss.append(val_loss.item())
+                print("total val loss", val_loss.item())
 
-            avg_val_loss = sum(val_batch_loss) / val_batchcount
+                if txt_log != None:
+                    print('val ep ' + str(epoch) + ' batch ' + str(val_batchcount) + 'mse loss ' + str(mse_loss_val) + ' total loss ' + str(val_loss.item()), file=txt_log, flush=True)
+                    #predict_plot(lr_fields[0].detach().numpy(), hr_fields[0].detach().numpy(), pt_coos[0].detach().numpy(), pt_vals[0].detach().numpy(), sr_pt_fields[0].detach().numpy())
 
-            if txt_log != None:
-                print('val ep ' + str(epoch) + ' batch ' + str(train_batchcount) + ' loss ' + str(val_loss.item()), file=txt_log, flush=True)
 
             val_batchcount+=1
 
         if not save_every_batch:
-            torch.save(model.state_dict(), model_name)
-
-
+            torch.save(model, model_name) 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Running training on the Block JNet')
