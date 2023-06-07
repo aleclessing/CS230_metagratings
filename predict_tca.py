@@ -113,7 +113,7 @@ if __name__ == '__main__':
     # truth_files = args.truth
     # in_files = args.input
 
-    hr_eps, lr_fields, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True)[int(args.exnum[0])]
+    hr_eps, lr_fields, hr_fields = dataloader.MetaGratingDataLoader(return_hres=True,lr_data_filename='data/metanet_lr_data_downsamp4.npy')[int(args.exnum[0])]
 
     #out_files = get_output_filenames(args)
 

@@ -8,32 +8,37 @@ import torch
 from utils import plot_hr_lr_sr
 from sklearn.metrics import mean_squared_error
 
-def predictWithInterpolation(input_im, scaling=2):
+def predictWithInterpolation(input_im, scaling=16):
     return scipy.ndimage.zoom(input_im, (1, scaling, scaling), order=1)
 
 def pltCompatisonsSamples(sampleNumber):
     exnum = sampleNumber # example to be plotted
-    model = "model1.pth" # SR model to be used
+    model = "models/model_tca_run2.pth" # SR model to be used
     # Interpolated data
-    data = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)
-    hr_im, lr_im = data[exnum]
-    pred_hr_im = predictWithInterpolation(lr_im)[1:3,:,:] # Slice to keep Real and Imaginary interpolated fields
+    data = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0,lr_data_filename='data/metanet_lr_data_downsamp16.npy')
+    hr_eps,lr_im, hr_im= data[exnum]
+    print(lr_im.shape)
+    pred_hr_im = predictWithInterpolation(lr_im)#[1:3,:,:] # Slice to keep Real and Imaginary interpolated fields
 
     # Predicted data by model
-    hr_img, lr_img = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)[int(exnum)]
-    net = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
+    # hr_eps, lr_fields, hr_fields = loader.MetaGratingDataLoader(return_hres=True)[int(exnum)]
+    hr_eps, lr_fields, hr_fields = loader.MetaGratingDataLoader(return_hres=True,lr_data_filename='data/metanet_lr_data_downsamp16.npy')[int(exnum)]
+    net = jnet.TCAJNet( static_channels=1, dynamic_channels=2, upsampling_layers=3)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     net.to(device=device)
-    state_dict = torch.load(model, map_location=device)
-    net.load_state_dict(state_dict)
-    sr_img = predict_img(net=net, lr_img=lr_img, device=device) # must first open a data file and read it into a numpy array    
-    plot_hr_lr_sr(hr_img, lr_img, sr_img,pred_hr_im)
+    # state_dict = torch.load(model, map_location=device)
+    # net.load_state_dict(state_dict)
+    net = torch.load(model)
+    sr_img = predict_img(net=net, lr_img=lr_fields,hr_eps=hr_eps, device=device) # must first open a data file and read it into a numpy array    
+    plot_hr_lr_sr(hr_fields, lr_fields, sr_img,pred_hr_im)
+    # must first open a data file and read it into a numpy array
+    # sr_fields = predict_img(net=net, lr_img=lr_fields, hr_eps=hr_eps, device=device)
 
 def pltMSEError(N):
     # Evaluate Error from Interpolation and Predictions accross N samples
     N = 100
     x = list(range(N)) #Sample Number Array 
-    model = "model1.pth" # SR model to be used
+    model = "models/model_tca_run1.pth" # SR model to be used
     ya1=[] #mse_pred_real
     ya2=[] #mse_pred_imag
     ya3=[] #mse_interp_real
@@ -44,7 +49,7 @@ def pltMSEError(N):
         hr_im, lr_im = data[i]
         pred_hr_im = predictWithInterpolation(lr_im)[1:3,:,:] # Slice to keep Real and Imaginary interpolated fields
         # Predicted data by model
-        hr_img, lr_img = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0)[int(i)]
+        hr_img, lr_img = loader.MetaGratingDataLoader(return_hres=True, n_samp_pts=0,lr_data_filename='data/metanet_lr_data_downsamp4.npy')[int(i)]
         net = jnet.JNet(im_dim=(64, 256), static_channels=1, dynamic_channels=2)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         net.to(device=device)
@@ -90,8 +95,7 @@ def pltMSEError(N):
 
 if __name__ == '__main__':
 
-    # pltCompatisonsSamples(1) #### PLOT ONE SAMPLE
+    pltCompatisonsSamples(1) #### PLOT ONE SAMPLE
     
-    pltMSEError(100)
+    # pltMSEError(100)
 
-    
