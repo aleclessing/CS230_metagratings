@@ -1,1 +1,0 @@
-python predict.py -e 1 -m model1.pth

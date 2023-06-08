@@ -1,0 +1,1 @@
+python3 pde_cont_train.py -e 50 -b 256 -l 0.03320185814703745 -s 16 -g 0.99381591774109 -w 4.0685603897820606e-05 -r pde_mlp_run5 -cpu 4

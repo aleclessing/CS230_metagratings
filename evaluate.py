@@ -2,11 +2,9 @@ import scipy.ndimage
 import numpy as np
 import dataloader as loader
 import matplotlib.pyplot as plt
-from predict import predict_img
+from predict_tca import predict_img
 import jnet
 import torch
-from utils import plot_hr_lr_sr
-from sklearn.metrics import mean_squared_error
 
 def predictWithInterpolation(input_im, scaling=2):
     return scipy.ndimage.zoom(input_im, (1, scaling, scaling), order=1)
