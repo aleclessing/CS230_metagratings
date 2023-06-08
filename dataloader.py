@@ -39,7 +39,7 @@ class MetaGratingDataLoader(Dataset):
           idx: int, index of the example to return. must be smaller than len(self).
 
         Returns:
-          TODO
+          Set of pytorch tensors that consistute one example
         """
 
         lres_space = np.array(self.lr_data[idx])
